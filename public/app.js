@@ -273,7 +273,7 @@
         const input = document.getElementById("roblox-username-input");
         const errEl = document.getElementById("auth-error");
         const btn = document.getElementById("roblox-connect-btn");
-        const username = (input?.value || "").trim();
+        const username = (input?.value || "").trim().replace(/^@+/, "");
         if (!username) {
             if (errEl) {
                 errEl.textContent = "Enter your Roblox username.";
@@ -453,6 +453,8 @@
         showSuccessIfNeeded();
     });
 
-    window.openSignupModal = window.openAppModal;
+    window.openSignupModal = function openSignupModal() {
+        window.location.href = "/Dashboard";
+    };
     window.closeSignupModal = window.closeAppModal;
 })();
