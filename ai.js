@@ -1,18 +1,13 @@
 /**
- * Puter OpenAI-compatible HTTP API (no @heyputer/puter.js WebSocket — avoids Node 22 Undici stack overflow).
+ * Puter OpenAI-compatible HTTP API.
  * @see https://developer.puter.com/tutorials/use-openai-sdk-with-puter/
  */
 const PUTER_OPENAI_BASE = "https://api.puter.com/puterai/openai/v1";
 
-/** Puter model IDs — see https://developer.puter.com/ai/models/ */
 export const PUTER_MODELS = {
-    /** OpenAI GPT-5.4 Mini */
     openai: "openai/gpt-5.4-mini",
-    /** Anthropic Claude Sonnet 4.6 */
     claude: "anthropic/claude-sonnet-4-6",
-    /** DeepSeek V3.2 */
     deepseek: "deepseek/deepseek-v3.2",
-    /** Google Gemini 3 Flash */
     gemini: "google/gemini-3-flash-preview",
 };
 
@@ -24,16 +19,9 @@ function resolveModel(providerOrId) {
         const key = env && PUTER_MODELS[env] ? env : DEFAULT_PROVIDER;
         return PUTER_MODELS[key];
     }
-    if (PUTER_MODELS[providerOrId]) {
-        return PUTER_MODELS[providerOrId];
-    }
-    return providerOrId;
+    return PUTER_MODELS[providerOrId] || providerOrId;
 }
 
-/**
- * @param {Array<{ role: string; content: string }>} messages
- * @param {string} model
- */
 async function puterChatCompletions(messages, model) {
     const token = process.env.PUTER_AUTH_TOKEN;
     if (!token) {
@@ -206,9 +194,7 @@ export async function generateAIResponse(prompt, options = {}) {
     try {
         parsed = JSON.parse(extractJsonObject(raw));
     } catch (e) {
-        const err = new Error(
-            `Failed to parse AI JSON: ${e.message}. Raw preview: ${raw.slice(0, 400)}`
-        );
+        const err = new Error(`Failed to parse AI JSON: ${e.message}. Raw preview: ${raw.slice(0, 400)}`);
         err.cause = e;
         throw err;
     }
