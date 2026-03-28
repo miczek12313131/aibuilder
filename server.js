@@ -69,23 +69,38 @@ function ensureProject(projectId) {
 
 /** Resolve Roblox username to user id + display info (server-side to avoid browser CORS). */
 app.post("/api/roblox/lookup", async (req, res) => {
-    const username = String(req.body?.username ?? "").trim();
+    const rawUsername = String(req.body?.username ?? "").trim();
+    const username = rawUsername.replace(/^@+/, "").trim();
     if (!username) {
         return res.status(400).json({ error: "Username is required." });
     }
     try {
-        const userRes = await fetch("https://users.roblox.com/v1/usernames/users", {
+        const usernamePayload = {
+            usernames: [username],
+            excludeBannedUsers: true,
+        };
+
+        let userRes = await fetch("https://users.roblox.com/v1/usernames/users", {
             method: "POST",
             headers: { "Content-Type": "application/json", Accept: "application/json" },
-            body: JSON.stringify({
-                usernames: [username],
-                excludeBannedUsers: true,
-            }),
+            body: JSON.stringify(usernamePayload),
         });
-        const userJson = await userRes.json();
-        const row = userJson?.data?.[0];
+        let userJson = await userRes.json();
+        let row = userJson?.data?.[0];
+
+        // Retry once including banned users so legitimate lookups don't fail on this flag.
         if (!row?.id) {
-            return res.status(404).json({ error: "No Roblox user found with that username." });
+            userRes = await fetch("https://users.roblox.com/v1/usernames/users", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Accept: "application/json" },
+                body: JSON.stringify({ ...usernamePayload, excludeBannedUsers: false }),
+            });
+            userJson = await userRes.json();
+            row = userJson?.data?.[0];
+        }
+
+        if (!row?.id) {
+            return res.status(404).json({ error: "No Roblox user found with that username. Try without @ and double-check spelling." });
         }
         const userId = row.id;
         const thumbRes = await fetch(
