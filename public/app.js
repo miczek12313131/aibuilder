@@ -451,8 +451,14 @@
         updateNavUser();
         loadPurchaseLinks();
         showSuccessIfNeeded();
+
+        if (document.getElementById("auth-view") && document.getElementById("studio-view")) {
+            syncModalToUser();
+        }
     });
 
-    window.openSignupModal = window.openAppModal;
+    window.openSignupModal = function openSignupModal() {
+        window.location.href = "/Dashboard";
+    };
     window.closeSignupModal = window.closeAppModal;
 })();
