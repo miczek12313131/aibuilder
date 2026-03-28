@@ -263,15 +263,7 @@ app.post("/api/projects/:id/messages", async (req, res) => {
 
 app.use(express.static("public"));
 
-app.get(["/success", "/projects/:id", "/Dashboard"], (_req, res) => {
-    res.sendFile(path.join(__dirname, "public", "dashboard.html"));
-});
-
-app.get(["/Purchase", "/Purchases"], (_req, res) => {
-    res.sendFile(path.join(__dirname, "public", "purchase.html"));
-});
-
-app.get("/", (_req, res) => {
+app.get(["/success", "/projects/:id"], (_req, res) => {
     res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 

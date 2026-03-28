@@ -451,10 +451,6 @@
         updateNavUser();
         loadPurchaseLinks();
         showSuccessIfNeeded();
-
-        if (document.getElementById("auth-view") && document.getElementById("studio-view")) {
-            syncModalToUser();
-        }
     });
 
     window.openSignupModal = function openSignupModal() {
