@@ -100,6 +100,15 @@ Your job is to generate SAFE, MINIMAL, and CORRECT script changes based on a use
 
 You MUST follow these rules strictly:
 
+The JSON must match this shape exactly:
+{"explanation":"string","changes":[{"path":"string","type":"replace","source":"string"}]}
+
+Rules:
+- "path" is a Roblox-style path like "ServerScriptService.Main" or "ReplicatedStorage.Module".
+- "type" is always "replace" for now (full script body replacement).
+- "source" is complete Luau source code, properly escaped for JSON.
+- Include a concise user-facing "explanation" that can be shown in the website chat.
+- Generate code that matches the user's request.`;
 1. Output ONLY valid JSON. No explanations, no markdown, no extra text.
 2. The JSON format MUST be:
 
@@ -160,14 +169,28 @@ function normalizeMessages(messages) {
         .filter(Boolean);
 }
 
+function normalizeMessages(messages) {
+    if (!Array.isArray(messages) || messages.length === 0) {
+        return null;
+    }
+    return messages
+        .map((msg) => {
+            const role = msg?.role === "assistant" ? "assistant" : "user";
+            const content = String(msg?.content ?? "").trim();
+            return content ? { role, content } : null;
+        })
+        .filter(Boolean);
+}
+
 /**
  * @param {string} prompt
- * @param {{ provider?: keyof typeof PUTER_MODELS | string }} [options]
- * @returns {Promise<{ changes: Array<{ path: string; type: string; source: string }> }>}
+ * @param {{ provider?: keyof typeof PUTER_MODELS | string; messages?: Array<{ role: string; content: string }> }} [options]
+ * @returns {Promise<{ changes: Array<{ path: string; type: string; source: string }> }>} 
  */
 export async function generateAIResponse(prompt, options = {}) {
     const model = resolveModel(options.provider);
     const normalizedMessages = normalizeMessages(options.messages);
+
     
     const raw = await puterChatCompletions(
         [
@@ -192,6 +215,10 @@ export async function generateAIResponse(prompt, options = {}) {
 
     if (!parsed || !Array.isArray(parsed.changes)) {
         throw new Error('AI JSON must include a "changes" array');
+    }
+
+    if (typeof parsed.explanation !== "string") {
+        parsed.explanation = "I generated the requested Roblox changes.";
     }
 
     return parsed;
