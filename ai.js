@@ -125,7 +125,8 @@ function normalizeMessages(messages) {
  */
 export async function generateAIResponse(prompt, options = {}) {
     const model = resolveModel(options.provider);
-
+    const normalizedMessages = normalizeMessages(options.messages);
+    
     const raw = await puterChatCompletions(
         [
             { role: "system", content: SYSTEM_PROMPT },
