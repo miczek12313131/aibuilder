@@ -96,7 +96,7 @@ Rules:
 - "type" is always "replace" for now (full script body replacement).
 - "source" is complete Luau source code, properly escaped for JSON.
 - Include a concise user-facing "explanation" that can be shown in the website chat.
-- Generate code that matches the user's request.`;
+- Generate code that matches the user's request.
 1. Output ONLY valid JSON. No explanations, no markdown, no extra text.
 2. The JSON format MUST be:
 
