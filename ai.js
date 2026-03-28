@@ -93,17 +93,19 @@ function extractJsonObject(text) {
     return candidate.slice(start, end + 1);
 }
 
-const SYSTEM_PROMPT = `You are RoScript's code assistant for Roblox (Luau). Respond with ONLY valid JSON, no markdown fences or commentary.
-
-The JSON must match this shape exactly:
-{"explanation":"string","changes":[{"path":"string","type":"replace","source":"string"}]}
-
-Rules:
-- "path" is a Roblox-style path like "ServerScriptService.Main" or "ReplicatedStorage.Module".
-- "type" is always "replace" for now (full script body replacement).
-- "source" is complete Luau source code, properly escaped for JSON.
-- Include a concise user-facing "explanation" that can be shown in the website chat.
-- Generate code that matches the user's request.`;
+const SYSTEM_PROMPT = [
+    "You are RoScript's code assistant for Roblox (Luau). Respond with ONLY valid JSON, no markdown fences or commentary.",
+    "",
+    "The JSON must match this shape exactly:",
+    '{"explanation":"string","changes":[{"path":"string","type":"replace","source":"string"}]}',
+    "",
+    "Rules:",
+    '- "path" is a Roblox-style path like "ServerScriptService.Main" or "ReplicatedStorage.Module".',
+    '- "type" is always "replace" for now (full script body replacement).',
+    '- "source" is complete Luau source code, properly escaped for JSON.',
+    '- Include a concise user-facing "explanation" that can be shown in the website chat.',
+    "- Generate code that matches the user's request.",
+].join("\n");
 
 function normalizeMessages(messages) {
     if (!Array.isArray(messages) || messages.length === 0) {
