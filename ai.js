@@ -73,11 +73,12 @@ async function puterChatCompletions(messages, model) {
 /**
  * Plain chat (no RoScript JSON schema). Use for interactive CLI or general Q&A.
  * @param {string} prompt
- * @param {{ provider?: keyof typeof PUTER_MODELS | string }} [options]
- * @returns {Promise<string>}
+  * @param {{ provider?: keyof typeof PUTER_MODELS | string; messages?: Array<{ role: string; content: string }> }} [options]
+ * @returns {Promise<{ changes: Array<{ path: string; type: string; source: string }> }>} 
  */
 export async function chatPuter(prompt, options = {}) {
     const model = resolveModel(options.provider);
+    const normalizedMessages = normalizeMessages(options.messages);
     return puterChatCompletions([{ role: "user", content: prompt }], model);
 }
 
@@ -104,6 +105,19 @@ Rules:
 - "source" is complete Luau source code, properly escaped for JSON.
 - Generate code that matches the user's request.`;
 
+function normalizeMessages(messages) {
+    if (!Array.isArray(messages) || messages.length === 0) {
+        return null;
+    }
+    return messages
+        .map((msg) => {
+            const role = msg?.role === "assistant" ? "assistant" : "user";
+            const content = String(msg?.content ?? "").trim();
+            return content ? { role, content } : null;
+        })
+        .filter(Boolean);
+}
+
 /**
  * @param {string} prompt
  * @param {{ provider?: keyof typeof PUTER_MODELS | string }} [options]
@@ -115,7 +129,9 @@ export async function generateAIResponse(prompt, options = {}) {
     const raw = await puterChatCompletions(
         [
             { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: prompt },
+            ...(normalizedMessages && normalizedMessages.length
+                ? normalizedMessages
+                : [{ role: "user", content: prompt }]),
         ],
         model
     );
