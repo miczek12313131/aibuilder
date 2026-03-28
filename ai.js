@@ -157,19 +157,6 @@ function normalizeMessages(messages) {
         .filter(Boolean);
 }
 
-function normalizeMessages(messages) {
-    if (!Array.isArray(messages) || messages.length === 0) {
-        return null;
-    }
-    return messages
-        .map((msg) => {
-            const role = msg?.role === "assistant" ? "assistant" : "user";
-            const content = String(msg?.content ?? "").trim();
-            return content ? { role, content } : null;
-        })
-        .filter(Boolean);
-}
-
 /**
  * @param {string} prompt
  * @param {{ provider?: keyof typeof PUTER_MODELS | string; messages?: Array<{ role: string; content: string }> }} [options]
