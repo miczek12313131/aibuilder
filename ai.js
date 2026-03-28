@@ -58,8 +58,15 @@ async function puterChatCompletions(messages, model) {
     return String(content);
 }
 
+/**
+ * Plain chat (no RoScript JSON schema). Use for interactive CLI or general Q&A.
+ * @param {string} prompt
+  * @param {{ provider?: keyof typeof PUTER_MODELS | string; messages?: Array<{ role: string; content: string }> }} [options]
+ * @returns {Promise<{ changes: Array<{ path: string; type: string; source: string }> }>} 
+ */
 export async function chatPuter(prompt, options = {}) {
     const model = resolveModel(options.provider);
+    const normalizedMessages = normalizeMessages(options.messages);
     return puterChatCompletions([{ role: "user", content: prompt }], model);
 }
 
@@ -75,19 +82,67 @@ function extractJsonObject(text) {
     return candidate.slice(start, end + 1);
 }
 
-const SYSTEM_PROMPT = [
-    "You are RoScript's code assistant for Roblox (Luau).",
-    "Output ONLY valid JSON, with no markdown and no extra text.",
-    "",
-    "JSON shape:",
-    '{"explanation":"string","changes":[{"path":"string","type":"replace","source":"string"}]}',
-    "",
-    "Rules:",
-    '- "path" must be a Roblox-like path, e.g. "ServerScriptService.Main".',
-    '- "type" is always "replace".',
-    '- "source" is full Luau source code escaped for JSON.',
-    '- "explanation" is concise user-facing text for UI display.',
-].join("\n");
+const SYSTEM_PROMPT = `You are an expert Roblox Lua engineer working inside Roblox Studio.
+
+Your job is to generate SAFE, MINIMAL, and CORRECT script changes based on a user request.
+
+You MUST follow these rules strictly:
+
+The JSON must match this shape exactly:
+{"explanation":"string","changes":[{"path":"string","type":"replace","source":"string"}]}
+
+Rules:
+- "path" is a Roblox-style path like "ServerScriptService.Main" or "ReplicatedStorage.Module".
+- "type" is always "replace" for now (full script body replacement).
+- "source" is complete Luau source code, properly escaped for JSON.
+- Include a concise user-facing "explanation" that can be shown in the website chat.
+- Generate code that matches the user's request.`;
+1. Output ONLY valid JSON. No explanations, no markdown, no extra text.
+2. The JSON format MUST be:
+
+{
+  "changes": [
+    {
+      "path": "Full.Path.To.Script",
+      "type": "create | replace | update",
+      "source": "Lua code here"
+    }
+  ]
+}
+
+3. Rules for paths:
+- Use valid Roblox hierarchy paths
+- Examples:
+  - ServerScriptService.Main
+  - StarterPlayer.StarterPlayerScripts.Client
+  - ReplicatedStorage.Modules.Inventory
+
+4. NEVER invent unknown services or invalid paths.
+5. NEVER modify multiple systems unless needed.
+6. Keep scripts SMALL and focused.
+7. Always write clean, production-ready Lua code.
+8. Use Roblox services properly (GetService).
+9. If a script does not exist, use type "create".
+10. If modifying existing logic, use "replace".
+
+11. DO NOT:
+- Explain anything
+- Add comments outside Lua
+- Output anything except JSON
+
+12. Code quality rules:
+- No unnecessary prints
+- No debug leftovers
+- Use clear variable names
+- Avoid global variables
+- Use proper event connections
+
+13. Safety rules:
+- Do NOT delete core systems
+- Do NOT overwrite unrelated scripts
+- Only modify what is required for the request
+
+You are part of an automated system. Incorrect format will break the pipeline.`;
 
 function normalizeMessages(messages) {
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -102,18 +157,38 @@ function normalizeMessages(messages) {
         .filter(Boolean);
 }
 
+function normalizeMessages(messages) {
+    if (!Array.isArray(messages) || messages.length === 0) {
+        return null;
+    }
+    return messages
+        .map((msg) => {
+            const role = msg?.role === "assistant" ? "assistant" : "user";
+            const content = String(msg?.content ?? "").trim();
+            return content ? { role, content } : null;
+        })
+        .filter(Boolean);
+}
+
+/**
+ * @param {string} prompt
+ * @param {{ provider?: keyof typeof PUTER_MODELS | string; messages?: Array<{ role: string; content: string }> }} [options]
+ * @returns {Promise<{ changes: Array<{ path: string; type: string; source: string }> }>} 
+ */
 export async function generateAIResponse(prompt, options = {}) {
     const model = resolveModel(options.provider);
     const normalizedMessages = normalizeMessages(options.messages);
 
-    const messages = [
-        { role: "system", content: SYSTEM_PROMPT },
-        ...(normalizedMessages && normalizedMessages.length
-            ? normalizedMessages
-            : [{ role: "user", content: String(prompt ?? "") }]),
-    ];
-
-    const raw = await puterChatCompletions(messages, model);
+    
+    const raw = await puterChatCompletions(
+        [
+            { role: "system", content: SYSTEM_PROMPT },
+            ...(normalizedMessages && normalizedMessages.length
+                ? normalizedMessages
+                : [{ role: "user", content: prompt }]),
+        ],
+        model
+    );
 
     let parsed;
     try {
