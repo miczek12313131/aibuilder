@@ -1,0 +1,66 @@
+{
+  "er8w1ku4bh": {
+    "prompt": "Hi",
+    "provider": "openai",
+    "result": {
+      "changes": [
+        {
+          "path": "ReplicatedStorage.Main",
+          "type": "replace",
+          "source": "return { greeting = \"Hello!\" }"
+        }
+      ]
+    },
+    "created": 1774664505092
+  },
+  "njckyxu2ii": {
+    "prompt": "All you can respond with is orange, nothing else.",
+    "provider": "openai",
+    "result": {
+      "changes": [
+        {
+          "path": "ServerScriptService.Main",
+          "type": "replace",
+          "source": "print(\"orange\")"
+        }
+      ]
+    },
+    "created": 1774664536306
+  },
+  "1z4yc2b9ng8j": {
+    "prompt": "Hi",
+    "provider": "claude",
+    "result": {
+      "changes": [
+        {
+          "path": "ServerScriptService.Main",
+          "type": "replace",
+          "source": "-- Hello! I'm RoScript's code assistant.\n-- Ask me to write or modify any Roblox Luau code for you!\nprint(\"Hello from RoScript!\")"
+        }
+      ]
+    },
+    "created": 1774664545567
+  },
+  "3gf37f1ccu": {
+    "prompt": "Hi",
+    "provider": "deepseek",
+    "result": {
+      "changes": []
+    },
+    "created": 1774664559384
+  },
+  "pvs9r4fcrkr": {
+    "prompt": "Hi",
+    "provider": "gemini",
+    "result": {
+      "changes": [
+        {
+          "path": "ServerScriptService.HelloWorld",
+          "type": "replace",
+          "source": "print(\"Hello from RoScript assistant!\")"
+        }
+      ]
+    },
+    "created": 1774664565036
+  }
+}

@@ -1,0 +1,2 @@
+{"sessionId":"24075a","location":"ai.js:runPuterWorker:spawn","message":"spawn puter worker","data":{"type":"messages","model":"openai/gpt-5.4-mini","node":"v22.19.0","hasToken":true},"timestamp":1774664330298,"hypothesisId":"H1"}
+{"sessionId":"24075a","location":"ai.js:runPuterWorker:close","message":"worker exit","data":{"code":1,"signal":null,"outLen":0,"errHead":"node:internal/event_target:1101\r\n  process.nextTick(() => { throw err; });\r\n                           ^\r\n\r\nRangeError: "},"timestamp":1774664330505,"hypothesisId":"H2"}
