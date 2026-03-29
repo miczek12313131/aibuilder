@@ -1,5 +1,6 @@
 (function () {
     const STORAGE_KEY = "roscript_roblox_user";
+    const CREDITS_KEY = "roscript_credits_balance";
 
     const MODEL_OPTIONS = [
         { value: "openai", label: "OpenAI · GPT-5.4 Mini" },
@@ -11,6 +12,36 @@
     let pendingVerification = null;
     let projects = [];
     let activeProjectId = null;
+
+
+    function getStoredCredits() {
+        try {
+            const raw = localStorage.getItem(CREDITS_KEY);
+            if (raw == null || raw === "") return null;
+            const n = Number(raw);
+            return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : null;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function renderCreditsPill() {
+        const el = document.getElementById("credits-pill");
+        if (!el) return;
+        const credits = getStoredCredits();
+        el.textContent = `Credits: ${credits == null ? "--" : credits}`;
+    }
+
+    function bindProjectsPanelToggle() {
+        const btn = document.getElementById("toggle-projects-btn");
+        const panel = document.getElementById("projects-panel");
+        if (!btn || !panel) return;
+
+        btn.addEventListener("click", () => {
+            const collapsed = panel.classList.toggle("hidden");
+            btn.textContent = collapsed ? "Show Projects" : "Hide Projects";
+        });
+    }
 
     function getStoredUser() {
         try {
@@ -235,6 +266,7 @@
 
     function syncModalToUser() {
         const u = getStoredUser();
+        renderCreditsPill();
         resetAuthUi();
         if (u) {
             const av = document.getElementById("studio-avatar");
@@ -449,6 +481,8 @@
         if (routeProject) activeProjectId = routeProject;
 
         updateNavUser();
+        syncModalToUser();
+        bindProjectsPanelToggle();
         loadPurchaseLinks();
         showSuccessIfNeeded();
     });
