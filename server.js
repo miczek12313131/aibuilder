@@ -21,6 +21,7 @@ const PURCHASE_LINKS = {
     pro: process.env.POLAR_PRO_CHECKOUT_URL || "",
     credits500: process.env.POLAR_500_CHECKOUT_URL || "",
     credits1200: process.env.POLAR_1200_CHECKOUT_URL || "",
+    credits1220: process.env.POLAR_1220_CHECKOUT_URL || process.env.POLAR_1200_CHECKOUT_URL || "",
 };
 
 function randomChallengeCode(length = 10) {
@@ -262,6 +263,15 @@ app.post("/api/projects/:id/messages", async (req, res) => {
 });
 
 app.use(express.static("public"));
+
+
+app.get(["/Dashboard", "/dashboard"], (_req, res) => {
+    res.sendFile(path.join(__dirname, "public", "dashboard.html"));
+});
+
+app.get(["/Purchase", "/purchase", "/Purchases", "/purchases"], (_req, res) => {
+    res.sendFile(path.join(__dirname, "public", "purchase.html"));
+});
 
 app.get(["/success", "/projects/:id"], (_req, res) => {
     res.sendFile(path.join(__dirname, "public", "index.html"));
