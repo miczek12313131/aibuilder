@@ -245,32 +245,55 @@
     }
 
     // ---------------- AUTH ----------------
-    async function connectRoblox() {
-        const input = el("roblox-username-input");
-        const username = (input?.value || "").trim().replace(/^@+/, "");
-        if (!username) return;
+   async function connectRoblox() {
+    const input = el("roblox-username-input");
+    const username = (input?.value || "").trim().replace(/^@+/, "");
+    if (!username) return;
 
-        try {
-            const lookup = await fetch("/api/roblox/lookup", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ username })
-            }).then(r => r.json());
+    try {
+        const lookupRes = await fetch("/api/roblox/lookup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username })
+        });
 
-            const challenge = await fetch("/api/roblox/challenge/start", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(lookup)
-            }).then(r => r.json());
+        const lookup = await lookupRes.json();
+        console.log("LOOKUP:", lookup);
 
-            pendingVerification = challenge;
-            el("auth-step-lookup")?.classList.add("hidden");
-            el("auth-step-verify")?.classList.remove("hidden");
-
-        } catch (e) {
-            window.showToast?.("auth failed");
+        if (!lookup.userId) {
+            throw new Error("Lookup failed");
         }
+
+        const challengeRes = await fetch("/api/roblox/challenge/start", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(lookup)
+        });
+
+        const challenge = await challengeRes.json();
+        console.log("CHALLENGE:", challenge);
+
+        if (!challenge.challengeId || !challenge.code) {
+            throw new Error("Challenge failed");
+        }
+
+        pendingVerification = challenge;
+
+        const verifyBox = el("auth-step-verify");
+        const lookupBox = el("auth-step-lookup");
+
+        lookupBox?.classList.add("hidden");
+        verifyBox?.classList.remove("hidden");
+
+        // 💥 pokaż kod użytkownikowi (jeśli masz UI)
+        const codeEl = el("challenge-code");
+        if (codeEl) codeEl.textContent = challenge.code;
+
+    } catch (e) {
+        console.error("connectRoblox error:", e);
+        window.showToast?.(e.message || "auth failed");
     }
+}
 
     async function verifyRoblox() {
         if (!pendingVerification) return;
