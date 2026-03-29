@@ -8,6 +8,10 @@
         { value: "gemini", label: "Gemini · 3 Flash" },
     ];
 
+    let pendingVerification = null;
+    let projects = [];
+    let activeProjectId = null;
+
     function getStoredUser() {
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
@@ -27,17 +31,13 @@
     }
 
     function showAuthView() {
-        const auth = document.getElementById("auth-view");
-        const studio = document.getElementById("studio-view");
-        if (auth) auth.classList.remove("hidden");
-        if (studio) studio.classList.add("hidden");
+        document.getElementById("auth-view")?.classList.remove("hidden");
+        document.getElementById("studio-view")?.classList.add("hidden");
     }
 
     function showStudioView() {
-        const auth = document.getElementById("auth-view");
-        const studio = document.getElementById("studio-view");
-        if (auth) auth.classList.add("hidden");
-        if (studio) studio.classList.remove("hidden");
+        document.getElementById("auth-view")?.classList.add("hidden");
+        document.getElementById("studio-view")?.classList.remove("hidden");
     }
 
     function updateNavUser() {
@@ -52,10 +52,7 @@
         }
         slot.classList.remove("hidden");
         slot.classList.add("flex");
-        slot.innerHTML = `
-            <img src="${avatarUrlForUser(u)}" alt="" class="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-600 object-cover" width="32" height="32" />
-            <span class="text-sm font-medium text-gray-700 dark:text-gray-200 max-w-[120px] truncate">${escapeHtml(u.name || u.username)}</span>
-        `;
+        slot.innerHTML = `<img src="${avatarUrlForUser(u)}" alt="" class="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-600 object-cover" width="32" height="32" /><span class="text-sm font-medium text-gray-700 dark:text-gray-200 max-w-[120px] truncate">${escapeHtml(u.name || u.username)}</span>`;
     }
 
     function escapeHtml(s) {
@@ -70,13 +67,175 @@
         return `https://ui-avatars.com/api/?name=${encodeURIComponent(u.username)}&background=0891b2&color=fff&size=128`;
     }
 
-    function syncModalToUser() {
-        const u = getStoredUser();
+    function resetAuthUi() {
         const err = document.getElementById("auth-error");
         if (err) {
             err.classList.add("hidden");
             err.textContent = "";
         }
+        document.getElementById("auth-step-lookup")?.classList.remove("hidden");
+        document.getElementById("auth-step-verify")?.classList.add("hidden");
+        pendingVerification = null;
+    }
+
+    function renderVerificationStep() {
+        document.getElementById("auth-step-lookup")?.classList.add("hidden");
+        document.getElementById("auth-step-verify")?.classList.remove("hidden");
+        const code = document.getElementById("auth-verify-code");
+        const username = document.getElementById("auth-verify-username");
+        if (code) code.textContent = pendingVerification?.code || "";
+        if (username) username.textContent = pendingVerification?.username || "";
+    }
+
+    function setPath(path) {
+        if (window.location.pathname !== path) {
+            window.history.pushState({}, "", path);
+        }
+    }
+
+    function renderProjectTabs() {
+        const list = document.getElementById("project-list");
+        if (!list) return;
+
+        if (!projects.length) {
+            list.innerHTML = '<p class="text-xs text-gray-500 dark:text-gray-400">No projects yet.</p>';
+            return;
+        }
+
+        list.innerHTML = projects
+            .map((project) => {
+                const active = project.id === activeProjectId;
+                return `<button data-project-id="${project.id}" class="project-tab w-full text-left rounded-lg px-2 py-1.5 text-xs ${
+                    active
+                        ? "bg-brand-100 text-brand-800 dark:bg-brand-900/30 dark:text-brand-200"
+                        : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+                }">${escapeHtml(project.name)}</button>`;
+            })
+            .join("");
+
+        document.querySelectorAll(".project-tab").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const id = btn.getAttribute("data-project-id");
+                openProject(id);
+            });
+        });
+    }
+
+    function getActiveProject() {
+        return projects.find((p) => p.id === activeProjectId) || null;
+    }
+
+    function renderActiveProjectChat() {
+        const title = document.getElementById("active-project-name");
+        const chat = document.getElementById("ai-chat-history");
+        const project = getActiveProject();
+
+        if (title) {
+            title.textContent = project ? project.name : "No project selected";
+        }
+        if (!chat) return;
+
+        if (!project || !Array.isArray(project.messages) || !project.messages.length) {
+            chat.innerHTML = '<p class="text-xs text-gray-500 dark:text-gray-400">Create/select a project and send a prompt to start chatting.</p>';
+            return;
+        }
+
+        chat.innerHTML = project.messages
+            .map((item) => {
+                const bubbleBase = "max-w-[85%] rounded-xl px-3 py-2 text-xs whitespace-pre-wrap break-words";
+                const bubbleClass =
+                    item.role === "user"
+                        ? `${bubbleBase} ml-auto bg-brand-600 text-white`
+                        : `${bubbleBase} mr-auto bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-gray-100`;
+                return `<div class="mb-2"><div class="${bubbleClass}">${escapeHtml(item.content || "")}</div></div>`;
+            })
+            .join("");
+        chat.scrollTop = chat.scrollHeight;
+    }
+
+    async function fetchProject(projectId) {
+        const res = await fetch(`/api/projects/${projectId}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || res.statusText);
+        return data.project;
+    }
+
+    async function refreshProjects() {
+        const res = await fetch("/api/projects");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || res.statusText);
+
+        const previous = activeProjectId;
+        projects = data.projects || [];
+        if (!activeProjectId && projects.length) {
+            activeProjectId = projects[0].id;
+        } else if (activeProjectId && !projects.some((p) => p.id === activeProjectId)) {
+            activeProjectId = projects.length ? projects[0].id : null;
+        }
+
+        renderProjectTabs();
+        if (activeProjectId) {
+            const full = await fetchProject(activeProjectId);
+            projects = projects.map((p) => (p.id === full.id ? full : p));
+        }
+        renderActiveProjectChat();
+
+        if (previous !== activeProjectId && activeProjectId) {
+            setPath(`/projects/${activeProjectId}`);
+        }
+    }
+
+    async function openProject(projectId) {
+        if (!projectId) return;
+        activeProjectId = projectId;
+        const full = await fetchProject(projectId);
+        projects = projects.map((p) => (p.id === full.id ? full : p));
+        if (!projects.some((p) => p.id === full.id)) projects.unshift(full);
+        renderProjectTabs();
+        renderActiveProjectChat();
+        setPath(`/projects/${projectId}`);
+    }
+
+    async function createProject() {
+        const nameInput = document.getElementById("new-project-name");
+        const name = (nameInput?.value || "").trim() || `Project ${projects.length + 1}`;
+        const res = await fetch("/api/projects", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || res.statusText);
+        if (nameInput) nameInput.value = "";
+        await refreshProjects();
+        await openProject(data.project.id);
+    }
+
+    async function loadPurchaseLinks() {
+        try {
+            const res = await fetch("/api/purchases/links");
+            const links = await res.json();
+            const map = [
+                ["buy-pro-btn", links.pro],
+                ["buy-500-btn", links.credits500],
+                ["buy-1200-btn", links.credits1200],
+            ];
+            map.forEach(([id, href]) => {
+                const a = document.getElementById(id);
+                if (!a) return;
+                if (!href) {
+                    a.classList.add("opacity-50", "pointer-events-none");
+                    a.title = "Checkout link not configured";
+                    return;
+                }
+                a.href = href;
+            });
+        } catch (_) {}
+    }
+
+    function syncModalToUser() {
+        const u = getStoredUser();
+        resetAuthUi();
         if (u) {
             const av = document.getElementById("studio-avatar");
             const dn = document.getElementById("studio-display-name");
@@ -88,6 +247,7 @@
             if (dn) dn.textContent = u.name || u.username;
             if (uid) uid.textContent = `ID: ${u.userId} · @${u.username}`;
             showStudioView();
+            refreshProjects().catch(() => {});
         } else {
             showAuthView();
         }
@@ -113,7 +273,7 @@
         const input = document.getElementById("roblox-username-input");
         const errEl = document.getElementById("auth-error");
         const btn = document.getElementById("roblox-connect-btn");
-        const username = (input?.value || "").trim();
+        const username = (input?.value || "").trim().replace(/^@+/, "");
         if (!username) {
             if (errEl) {
                 errEl.textContent = "Enter your Roblox username.";
@@ -124,18 +284,65 @@
         if (errEl) errEl.classList.add("hidden");
         if (btn) {
             btn.disabled = true;
-            btn.textContent = "Connecting…";
+            btn.textContent = "Preparing…";
         }
         try {
-            const res = await fetch("/api/roblox/lookup", {
+            const lookupRes = await fetch("/api/roblox/lookup", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ username }),
             });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) {
-                throw new Error(data.error || res.statusText);
+            const lookup = await lookupRes.json().catch(() => ({}));
+            if (!lookupRes.ok) throw new Error(lookup.error || lookupRes.statusText);
+
+            const challengeRes = await fetch("/api/roblox/challenge/start", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId: lookup.userId, username: lookup.username }),
+            });
+            const challenge = await challengeRes.json().catch(() => ({}));
+            if (!challengeRes.ok) throw new Error(challenge.error || challengeRes.statusText);
+
+            pendingVerification = {
+                challengeId: challenge.challengeId,
+                code: challenge.code,
+                userId: lookup.userId,
+                username: lookup.username,
+            };
+            renderVerificationStep();
+        } catch (e) {
+            if (errEl) {
+                errEl.textContent = e.message || "Could not start verification.";
+                errEl.classList.remove("hidden");
             }
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = "Start verification";
+            }
+        }
+    }
+
+    async function onVerifyRoblox() {
+        const errEl = document.getElementById("auth-error");
+        const verifyBtn = document.getElementById("roblox-verify-btn");
+        if (!pendingVerification?.challengeId) return;
+
+        if (errEl) errEl.classList.add("hidden");
+        if (verifyBtn) {
+            verifyBtn.disabled = true;
+            verifyBtn.textContent = "Checking…";
+        }
+
+        try {
+            const res = await fetch("/api/roblox/challenge/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ challengeId: pendingVerification.challengeId }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || res.statusText);
+
             saveUser({
                 userId: data.userId,
                 username: data.username,
@@ -143,87 +350,62 @@
                 avatarUrl: data.avatarUrl,
                 connectedAt: Date.now(),
             });
+            pendingVerification = null;
             syncModalToUser();
             updateNavUser();
-            if (typeof window.showToast === "function") {
-                window.showToast("Roblox account connected.");
-            }
+            if (typeof window.showToast === "function") window.showToast("Roblox account verified.");
         } catch (e) {
             if (errEl) {
-                errEl.textContent = e.message || "Could not connect.";
+                errEl.textContent = e.message || "Could not verify.";
                 errEl.classList.remove("hidden");
             }
         } finally {
-            if (btn) {
-                btn.disabled = false;
-                btn.textContent = "Connect";
+            if (verifyBtn) {
+                verifyBtn.disabled = false;
+                verifyBtn.textContent = "Verify now";
             }
         }
     }
 
+    function onCancelVerify() {
+        resetAuthUi();
+    }
+
     function onLogout() {
         clearUser();
+        projects = [];
+        activeProjectId = null;
         syncModalToUser();
         updateNavUser();
-        const out = document.getElementById("ai-output");
-        if (out) {
-            out.classList.add("hidden");
-            out.textContent = "";
-        }
-        const ta = document.getElementById("ai-prompt");
-        if (ta) ta.value = "";
-        if (typeof window.showToast === "function") {
-            window.showToast("Logged out.");
-        }
+        if (typeof window.showToast === "function") window.showToast("Logged out.");
     }
 
     async function onSendPrompt() {
         const ta = document.getElementById("ai-prompt");
         const sel = document.getElementById("ai-model");
-        const out = document.getElementById("ai-output");
         const btn = document.getElementById("ai-send-btn");
         const prompt = (ta?.value || "").trim();
-        if (!prompt) {
-            if (typeof window.showToast === "function") window.showToast("Enter a prompt first.");
-            return;
-        }
-        if (!getStoredUser()) {
-            if (typeof window.showToast === "function") window.showToast("Connect your Roblox account first.");
-            return;
-        }
+        if (!prompt || !activeProjectId) return;
+
         const provider = sel?.value || "openai";
         if (btn) {
             btn.disabled = true;
             btn.textContent = "…";
         }
-        if (out) {
-            out.classList.remove("hidden");
-            out.textContent = "Generating…";
-        }
+
         try {
-            const res = await fetch("/generate", {
+            const res = await fetch(`/api/projects/${activeProjectId}/messages`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ prompt, provider }),
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data.error || res.statusText);
-            const jobId = data.jobId;
-            let job = {};
-            for (let i = 0; i < 60; i++) {
-                const jr = await fetch(`/jobs/${jobId}`);
-                job = await jr.json();
-                if (job && job.result) break;
-                await new Promise((r) => setTimeout(r, 500));
-            }
-            if (out) {
-                out.textContent = job.result
-                    ? JSON.stringify(job.result, null, 2)
-                    : "Timed out waiting for result.";
-            }
-            if (typeof window.showToast === "function") window.showToast("Generation complete.");
+            const idx = projects.findIndex((p) => p.id === activeProjectId);
+            if (idx >= 0) projects[idx] = data.project;
+            renderActiveProjectChat();
+            if (ta) ta.value = "";
         } catch (e) {
-            if (out) out.textContent = "Error: " + (e.message || String(e));
             if (typeof window.showToast === "function") window.showToast(e.message || "Request failed.");
         } finally {
             if (btn) {
@@ -231,6 +413,12 @@
                 btn.textContent = "Send";
             }
         }
+    }
+
+    function showSuccessIfNeeded() {
+        if (window.location.pathname !== "/success") return;
+        const banner = document.getElementById("purchase-success");
+        if (banner) banner.classList.remove("hidden");
     }
 
     document.addEventListener("DOMContentLoaded", () => {
@@ -245,14 +433,11 @@
         }
 
         document.getElementById("roblox-connect-btn")?.addEventListener("click", onConnectRoblox);
-        document.getElementById("roblox-username-input")?.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                onConnectRoblox();
-            }
-        });
+        document.getElementById("roblox-verify-btn")?.addEventListener("click", onVerifyRoblox);
+        document.getElementById("roblox-verify-cancel-btn")?.addEventListener("click", onCancelVerify);
         document.getElementById("roblox-logout-btn")?.addEventListener("click", onLogout);
         document.getElementById("ai-send-btn")?.addEventListener("click", onSendPrompt);
+        document.getElementById("new-project-btn")?.addEventListener("click", () => createProject().catch((e) => window.showToast?.(e.message || "Failed to create project")));
         document.getElementById("ai-prompt")?.addEventListener("keydown", (e) => {
             if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
@@ -260,9 +445,20 @@
             }
         });
 
+        const routeProject = window.location.pathname.match(/^\/projects\/([a-z0-9]+)/i)?.[1];
+        if (routeProject) activeProjectId = routeProject;
+
         updateNavUser();
+        loadPurchaseLinks();
+        showSuccessIfNeeded();
+
+        if (document.getElementById("auth-view") && document.getElementById("studio-view")) {
+            syncModalToUser();
+        }
     });
 
-    window.openSignupModal = window.openAppModal;
+    window.openSignupModal = function openSignupModal() {
+        window.location.href = "/dashboard";
+    };
     window.closeSignupModal = window.closeAppModal;
 })();
