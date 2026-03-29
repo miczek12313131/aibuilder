@@ -1,18 +1,13 @@
 /**
- * Puter OpenAI-compatible HTTP API (no @heyputer/puter.js WebSocket — avoids Node 22 Undici stack overflow).
+ * Puter OpenAI-compatible HTTP API.
  * @see https://developer.puter.com/tutorials/use-openai-sdk-with-puter/
  */
 const PUTER_OPENAI_BASE = "https://api.puter.com/puterai/openai/v1";
 
-/** Puter model IDs — see https://developer.puter.com/ai/models/ */
 export const PUTER_MODELS = {
-    /** OpenAI GPT-5.4 Mini */
     openai: "openai/gpt-5.4-mini",
-    /** Anthropic Claude Sonnet 4.6 */
     claude: "anthropic/claude-sonnet-4-6",
-    /** DeepSeek V3.2 */
     deepseek: "deepseek/deepseek-v3.2",
-    /** Google Gemini 3 Flash */
     gemini: "google/gemini-3-flash-preview",
 };
 
@@ -24,16 +19,9 @@ function resolveModel(providerOrId) {
         const key = env && PUTER_MODELS[env] ? env : DEFAULT_PROVIDER;
         return PUTER_MODELS[key];
     }
-    if (PUTER_MODELS[providerOrId]) {
-        return PUTER_MODELS[providerOrId];
-    }
-    return providerOrId;
+    return PUTER_MODELS[providerOrId] || providerOrId;
 }
 
-/**
- * @param {Array<{ role: string; content: string }>} messages
- * @param {string} model
- */
 async function puterChatCompletions(messages, model) {
     const token = process.env.PUTER_AUTH_TOKEN;
     if (!token) {
@@ -70,12 +58,6 @@ async function puterChatCompletions(messages, model) {
     return String(content);
 }
 
-/**
- * Plain chat (no RoScript JSON schema). Use for interactive CLI or general Q&A.
- * @param {string} prompt
- * @param {{ provider?: keyof typeof PUTER_MODELS | string }} [options]
- * @returns {Promise<string>}
- */
 export async function chatPuter(prompt, options = {}) {
     const model = resolveModel(options.provider);
     return puterChatCompletions([{ role: "user", content: prompt }], model);
@@ -93,46 +75,61 @@ function extractJsonObject(text) {
     return candidate.slice(start, end + 1);
 }
 
-const SYSTEM_PROMPT = `You are RoScript's code assistant for Roblox (Luau). Respond with ONLY valid JSON, no markdown fences or commentary.
+const SYSTEM_PROMPT = [
+    "You are RoScript's code assistant for Roblox (Luau).",
+    "Output ONLY valid JSON, with no markdown and no extra text.",
+    "",
+    "JSON shape:",
+    '{"explanation":"string","changes":[{"path":"string","type":"replace","source":"string"}]}',
+    "",
+    "Rules:",
+    '- "path" must be a Roblox-like path, e.g. "ServerScriptService.Main".',
+    '- "type" is always "replace".',
+    '- "source" is full Luau source code escaped for JSON.',
+    '- "explanation" is concise user-facing text for UI display.',
+].join("\n");
 
-The JSON must match this shape exactly:
-{"changes":[{"path":"string","type":"replace","source":"string"}]}
+function normalizeMessages(messages) {
+    if (!Array.isArray(messages) || messages.length === 0) {
+        return null;
+    }
+    return messages
+        .map((msg) => {
+            const role = msg?.role === "assistant" ? "assistant" : "user";
+            const content = String(msg?.content ?? "").trim();
+            return content ? { role, content } : null;
+        })
+        .filter(Boolean);
+}
 
-Rules:
-- "path" is a Roblox-style path like "ServerScriptService.Main" or "ReplicatedStorage.Module".
-- "type" is always "replace" for now (full script body replacement).
-- "source" is complete Luau source code, properly escaped for JSON.
-- Generate code that matches the user's request.`;
-
-/**
- * @param {string} prompt
- * @param {{ provider?: keyof typeof PUTER_MODELS | string }} [options]
- * @returns {Promise<{ changes: Array<{ path: string; type: string; source: string }> }>}
- */
 export async function generateAIResponse(prompt, options = {}) {
     const model = resolveModel(options.provider);
+    const normalizedMessages = normalizeMessages(options.messages);
 
-    const raw = await puterChatCompletions(
-        [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: prompt },
-        ],
-        model
-    );
+    const messages = [
+        { role: "system", content: SYSTEM_PROMPT },
+        ...(normalizedMessages && normalizedMessages.length
+            ? normalizedMessages
+            : [{ role: "user", content: String(prompt ?? "") }]),
+    ];
+
+    const raw = await puterChatCompletions(messages, model);
 
     let parsed;
     try {
         parsed = JSON.parse(extractJsonObject(raw));
     } catch (e) {
-        const err = new Error(
-            `Failed to parse AI JSON: ${e.message}. Raw preview: ${raw.slice(0, 400)}`
-        );
+        const err = new Error(`Failed to parse AI JSON: ${e.message}. Raw preview: ${raw.slice(0, 400)}`);
         err.cause = e;
         throw err;
     }
 
     if (!parsed || !Array.isArray(parsed.changes)) {
         throw new Error('AI JSON must include a "changes" array');
+    }
+
+    if (typeof parsed.explanation !== "string") {
+        parsed.explanation = "I generated the requested Roblox changes.";
     }
 
     return parsed;
