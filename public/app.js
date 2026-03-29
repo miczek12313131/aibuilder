@@ -1,5 +1,6 @@
 (function () {
     const STORAGE_KEY = "roscript_roblox_user";
+    const CREDITS_KEY = "roscript_credits_balance";
 
     const MODEL_OPTIONS = [
         { value: "openai", label: "OpenAI · GPT-5.4 Mini" },
@@ -11,6 +12,38 @@
     let pendingVerification = null;
     let projects = [];
     let activeProjectId = null;
+
+
+    function getStoredCredits() {
+        try {
+            const raw = localStorage.getItem(CREDITS_KEY);
+            if (raw == null || raw === "") return null;
+            const n = Number(raw);
+            return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : null;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function renderCreditsPill() {
+        const el = document.getElementById("credits-pill");
+        if (!el) return;
+        const credits = getStoredCredits();
+        el.textContent = `Credits: ${credits == null ? "--" : credits}`;
+    }
+
+    function bindProjectsPanelToggle() {
+        const btn = document.getElementById("toggle-projects-btn");
+        const panel = document.getElementById("projects-panel");
+        if (!btn || !panel) return;
+
+        btn.textContent = panel.classList.contains("hidden") ? "Show Projects" : "Hide Projects";
+
+        btn.addEventListener("click", () => {
+            const collapsed = panel.classList.toggle("hidden");
+            btn.textContent = collapsed ? "Show Projects" : "Hide Projects";
+        });
+    }
 
     function getStoredUser() {
         try {
@@ -88,6 +121,17 @@
     }
 
     function setPath(path) {
+        const onDashboard = /^\/dashboard$/i.test(window.location.pathname);
+        const projectMatch = String(path || "").match(/^\/projects\/([a-z0-9_-]+)/i);
+
+        if (onDashboard && projectMatch?.[1]) {
+            const url = new URL(window.location.href);
+            url.pathname = "/Dashboard";
+            url.searchParams.set("project", projectMatch[1]);
+            window.history.replaceState({}, "", url.toString());
+            return;
+        }
+
         if (window.location.pathname !== path) {
             window.history.pushState({}, "", path);
         }
@@ -218,7 +262,7 @@
             const map = [
                 ["buy-pro-btn", links.pro],
                 ["buy-500-btn", links.credits500],
-                ["buy-1200-btn", links.credits1200],
+                ["buy-1220-btn", links.credits1220 || links.credits1200],
             ];
             map.forEach(([id, href]) => {
                 const a = document.getElementById(id);
@@ -235,6 +279,7 @@
 
     function syncModalToUser() {
         const u = getStoredUser();
+        renderCreditsPill();
         resetAuthUi();
         if (u) {
             const av = document.getElementById("studio-avatar");
@@ -385,7 +430,15 @@
         const sel = document.getElementById("ai-model");
         const btn = document.getElementById("ai-send-btn");
         const prompt = (ta?.value || "").trim();
-        if (!prompt || !activeProjectId) return;
+        if (!prompt) return;
+
+        if (!activeProjectId) {
+            await createProject();
+        }
+        if (!activeProjectId) {
+            window.showToast?.("Create a project first.");
+            return;
+        }
 
         const provider = sel?.value || "openai";
         if (btn) {
@@ -438,6 +491,12 @@
         document.getElementById("roblox-logout-btn")?.addEventListener("click", onLogout);
         document.getElementById("ai-send-btn")?.addEventListener("click", onSendPrompt);
         document.getElementById("new-project-btn")?.addEventListener("click", () => createProject().catch((e) => window.showToast?.(e.message || "Failed to create project")));
+        document.getElementById("new-project-name")?.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                createProject().catch((err) => window.showToast?.(err.message || "Failed to create project"));
+            }
+        });
         document.getElementById("ai-prompt")?.addEventListener("keydown", (e) => {
             if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
@@ -445,10 +504,13 @@
             }
         });
 
-        const routeProject = window.location.pathname.match(/^\/projects\/([a-z0-9]+)/i)?.[1];
+        const queryProject = new URLSearchParams(window.location.search).get("project");
+        const routeProject = queryProject || window.location.pathname.match(/^\/projects\/([a-z0-9_-]+)/i)?.[1];
         if (routeProject) activeProjectId = routeProject;
 
         updateNavUser();
+        syncModalToUser();
+        bindProjectsPanelToggle();
         loadPurchaseLinks();
         showSuccessIfNeeded();
     });
