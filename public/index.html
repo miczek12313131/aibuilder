@@ -518,6 +518,8 @@
         </div>
     </section>
 
+    <div id="purchase-success" class="hidden fixed top-20 left-1/2 z-50 -translate-x-1/2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 shadow dark:border-green-700/40 dark:bg-green-900/30 dark:text-green-200">Purchase successful! Your plan/credits will be applied shortly.</div>
+
     <!-- App: Roblox link + AI prompt -->
     <div id="app-modal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="app-modal-title" role="dialog" aria-modal="true">
         <div class="flex min-h-full items-end justify-center p-4 sm:items-center sm:p-6 text-center">
@@ -532,16 +534,26 @@
                 <div class="px-5 py-5 sm:px-6">
                     <!-- Connect Roblox -->
                     <div id="auth-view">
-                        <p class="text-sm text-gray-600 dark:text-gray-300 mb-1">Connect your Roblox account</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Enter your Roblox <strong class="font-medium text-gray-700 dark:text-gray-300">username</strong>. We look up your public user ID and display name from Roblox and save them on this device so you stay signed in.</p>
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                        <p class="text-sm text-gray-600 dark:text-gray-300 mb-1">Verify your Roblox account</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Enter your Roblox <strong class="font-medium text-gray-700 dark:text-gray-300">username</strong>. We will generate a random code for your bio. Once your bio contains that code, click verify to sign in.</p>
+                        <div id="auth-step-lookup" class="space-y-3">
                             <div class="flex-1 text-left">
                                 <label for="roblox-username-input" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Roblox username</label>
                                 <input id="roblox-username-input" type="text" autocomplete="username" placeholder="e.g. Roblox" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-gray-900 shadow-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
                             </div>
                             <button type="button" id="roblox-connect-btn" class="inline-flex justify-center items-center rounded-lg bg-gradient-to-r from-brand-500 to-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:from-brand-600 hover:to-brand-700 disabled:opacity-60">
-                                Connect
+                                Start verification
                             </button>
+                        </div>
+                        <div id="auth-step-verify" class="hidden rounded-xl border border-brand-200 bg-brand-50/60 p-3 dark:border-brand-700/40 dark:bg-brand-900/20 mt-3">
+                            <p class="text-xs text-gray-600 dark:text-gray-300">Signed-in target: <strong class="font-semibold">@<span id="auth-verify-username"></span></strong></p>
+                            <p class="mt-2 text-xs text-gray-600 dark:text-gray-300">1) Copy this code and add it anywhere in your Roblox bio:</p>
+                            <code id="auth-verify-code" class="mt-1 block rounded-lg border border-brand-300 bg-white px-2 py-1 text-sm font-semibold text-brand-700 dark:border-brand-500/40 dark:bg-gray-900 dark:text-brand-300"></code>
+                            <p class="mt-2 text-xs text-gray-600 dark:text-gray-300">2) Save your bio on Roblox, then click verify.</p>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                                <button type="button" id="roblox-verify-btn" class="inline-flex justify-center items-center rounded-lg bg-gradient-to-r from-brand-500 to-brand-600 px-4 py-2 text-xs font-semibold text-white shadow hover:from-brand-600 hover:to-brand-700 disabled:opacity-60">Verify now</button>
+                                <button type="button" id="roblox-verify-cancel-btn" class="inline-flex justify-center items-center rounded-lg border border-gray-300 px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">Use a different username</button>
+                            </div>
                         </div>
                         <p id="auth-error" class="mt-2 text-sm text-red-600 dark:text-red-400 hidden" role="alert"></p>
                     </div>
@@ -557,21 +569,40 @@
                             </div>
                             <button type="button" id="roblox-logout-btn" class="text-sm font-medium text-brand-600 hover:text-brand-500 dark:text-brand-400">Log out</button>
                         </div>
-                        <label for="ai-prompt" class="sr-only">AI prompt</label>
-                        <div class="relative rounded-xl border border-gray-200 bg-gray-50/80 dark:border-gray-600 dark:bg-gray-900/40">
-                            <textarea id="ai-prompt" rows="6" placeholder="Describe what you want to build or change…" class="w-full resize-y rounded-xl border-0 bg-transparent px-4 py-3 pb-24 text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-brand-500/40 dark:text-white min-h-[160px]"></textarea>
-                            <div class="pointer-events-none absolute bottom-0 left-0 right-0 h-20 rounded-b-xl bg-gradient-to-t from-white/95 to-transparent dark:from-gray-800/95"></div>
-                            <div class="pointer-events-auto absolute bottom-2 right-2 left-2 flex flex-wrap items-center justify-end gap-2 sm:left-auto sm:pl-0">
-                                <select id="ai-model" class="pointer-events-auto max-w-[min(100%,14rem)] rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-8 text-xs font-medium text-gray-800 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"></select>
-                                <span id="credits-display" class="pointer-events-none rounded-lg border border-dashed border-gray-300 bg-white/90 px-2.5 py-2 text-xs text-gray-500 dark:border-gray-600 dark:bg-gray-800/90 dark:text-gray-400" title="Credits coming soon">Credits: —</span>
-                                <button type="button" id="ai-send-btn" class="pointer-events-auto inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-brand-500 to-brand-600 px-4 py-2 text-sm font-semibold text-white shadow hover:from-brand-600 hover:to-brand-700 disabled:opacity-60">
-                                    Send
-                                    <i data-lucide="send" class="h-4 w-4"></i>
-                                </button>
+
+                        <div class="mb-4 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-900/30">
+                            <p class="text-xs font-semibold text-gray-700 dark:text-gray-200">Purchase</p>
+                            <div class="mt-2 flex flex-wrap gap-2">
+                                <a id="buy-pro-btn" target="_blank" rel="noreferrer" class="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white">Buy PRO Tier</a>
+                                <a id="buy-500-btn" target="_blank" rel="noreferrer" class="rounded-lg bg-gray-800 px-3 py-1.5 text-xs font-semibold text-white dark:bg-gray-600">Buy 500 Credits</a>
+                                <a id="buy-1200-btn" target="_blank" rel="noreferrer" class="rounded-lg bg-gray-800 px-3 py-1.5 text-xs font-semibold text-white dark:bg-gray-600">Buy 1200 Credits</a>
                             </div>
                         </div>
-                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Tip: <kbd class="rounded border border-gray-300 dark:border-gray-600 px-1">Ctrl</kbd>+<kbd class="rounded border border-gray-300 dark:border-gray-600 px-1">Enter</kbd> to send.</p>
-                        <pre id="ai-output" class="mt-4 hidden max-h-64 overflow-auto rounded-lg border border-gray-200 bg-gray-900 p-3 text-left text-xs text-brand-100 dark:border-gray-600"></pre>
+
+                        <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                            <div class="rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-900/30">
+                                <p class="text-xs font-semibold text-gray-700 dark:text-gray-200">Projects</p>
+                                <div class="mt-2 flex gap-2">
+                                    <input id="new-project-name" type="text" placeholder="Project name" class="w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100">
+                                    <button id="new-project-btn" type="button" class="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white">New</button>
+                                </div>
+                                <div id="project-list" class="mt-3 space-y-1"></div>
+                            </div>
+                            <div class="lg:col-span-2">
+                                <div class="mb-2 text-xs font-semibold text-gray-700 dark:text-gray-200">Active: <span id="active-project-name"></span></div>
+                                <label for="ai-prompt" class="sr-only">AI prompt</label>
+                                <div class="relative rounded-xl border border-gray-200 bg-gray-50/80 dark:border-gray-600 dark:bg-gray-900/40">
+                                    <textarea id="ai-prompt" rows="6" placeholder="Describe what you want to build or change…" class="w-full resize-y rounded-xl border-0 bg-transparent px-4 py-3 pb-24 text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-brand-500/40 dark:text-white min-h-[160px]"></textarea>
+                                    <div class="pointer-events-none absolute bottom-0 left-0 right-0 h-20 rounded-b-xl bg-gradient-to-t from-white/95 to-transparent dark:from-gray-800/95"></div>
+                                    <div class="pointer-events-auto absolute bottom-2 right-2 left-2 flex flex-wrap items-center justify-end gap-2 sm:left-auto sm:pl-0">
+                                        <select id="ai-model" class="pointer-events-auto max-w-[min(100%,14rem)] rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-8 text-xs font-medium text-gray-800 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"></select>
+                                        <button type="button" id="ai-send-btn" class="pointer-events-auto inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-brand-500 to-brand-600 px-4 py-2 text-sm font-semibold text-white shadow hover:from-brand-600 hover:to-brand-700 disabled:opacity-60">Send <i data-lucide="send" class="h-4 w-4"></i></button>
+                                    </div>
+                                </div>
+                                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Tip: <kbd class="rounded border border-gray-300 dark:border-gray-600 px-1">Ctrl</kbd>+<kbd class="rounded border border-gray-300 dark:border-gray-600 px-1">Enter</kbd> to send.</p>
+                                <div id="ai-chat-history" class="mt-4 max-h-72 overflow-auto rounded-lg border border-gray-200 bg-white p-3 text-left dark:border-gray-600 dark:bg-gray-900/40"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -671,7 +702,7 @@
         </div>
     </footer>
 
-    <script src="app.js"></script>
+    <script src="/app.js"></script>
     <script>
         // Initialize Lucide icons
         lucide.createIcons();
