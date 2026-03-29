@@ -1,3 +1,59 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RoScripter Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#ecfeff',
+              100: '#cffafe',
+              200: '#a5f3fc',
+              300: '#67e8f9',
+              400: '#22d3ee',
+              500: '#06b6d4',
+              600: '#0891b2',
+              700: '#0e7490',
+              800: '#155e75',
+              900: '#164e63',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    .glass {
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .glass-dark {
+      background: rgba(17, 24, 39, 0.82);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .mesh-bg {
+      background-color: #ffffff;
+      background-image: radial-gradient(at 40% 20%, hsla(190,100%,94%,1) 0px, transparent 50%),
+                        radial-gradient(at 80% 0%, hsla(190,100%,90%,1) 0px, transparent 50%),
+                        radial-gradient(at 0% 50%, hsla(190,100%,96%,1) 0px, transparent 50%),
+                        radial-gradient(at 80% 50%, hsla(190,100%,92%,1) 0px, transparent 50%),
+                        radial-gradient(at 0% 100%, hsla(190,100%,88%,1) 0px, transparent 50%);
+    }
+  </style>
+</head>
 <body class="h-screen overflow-hidden font-sans antialiased text-gray-900 dark:text-white mesh-bg dark:bg-gray-900">
 
 <!-- 🔐 AUTH OVERLAY -->
@@ -91,3 +147,4 @@
     </div>
   </div>
 </div>
+</html>
