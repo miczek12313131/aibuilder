@@ -119,17 +119,6 @@
     }
 
     function setPath(path) {
-        const onDashboard = /^\/dashboard$/i.test(window.location.pathname);
-        const projectMatch = String(path || "").match(/^\/projects\/([a-z0-9_-]+)/i);
-
-        if (onDashboard && projectMatch?.[1]) {
-            const url = new URL(window.location.href);
-            url.pathname = "/Dashboard";
-            url.searchParams.set("project", projectMatch[1]);
-            window.history.replaceState({}, "", url.toString());
-            return;
-        }
-
         if (window.location.pathname !== path) {
             window.history.pushState({}, "", path);
         }
@@ -428,15 +417,7 @@
         const sel = document.getElementById("ai-model");
         const btn = document.getElementById("ai-send-btn");
         const prompt = (ta?.value || "").trim();
-        if (!prompt) return;
-
-        if (!activeProjectId) {
-            await createProject();
-        }
-        if (!activeProjectId) {
-            window.showToast?.("Create a project first.");
-            return;
-        }
+        if (!prompt || !activeProjectId) return;
 
         const provider = sel?.value || "openai";
         if (btn) {
@@ -489,12 +470,6 @@
         document.getElementById("roblox-logout-btn")?.addEventListener("click", onLogout);
         document.getElementById("ai-send-btn")?.addEventListener("click", onSendPrompt);
         document.getElementById("new-project-btn")?.addEventListener("click", () => createProject().catch((e) => window.showToast?.(e.message || "Failed to create project")));
-        document.getElementById("new-project-name")?.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                createProject().catch((err) => window.showToast?.(err.message || "Failed to create project"));
-            }
-        });
         document.getElementById("ai-prompt")?.addEventListener("keydown", (e) => {
             if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
@@ -502,8 +477,7 @@
             }
         });
 
-        const queryProject = new URLSearchParams(window.location.search).get("project");
-        const routeProject = queryProject || window.location.pathname.match(/^\/projects\/([a-z0-9_-]+)/i)?.[1];
+        const routeProject = window.location.pathname.match(/^\/projects\/([a-z0-9]+)/i)?.[1];
         if (routeProject) activeProjectId = routeProject;
 
         updateNavUser();
