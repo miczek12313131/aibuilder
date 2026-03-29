@@ -119,6 +119,17 @@
     }
 
     function setPath(path) {
+        const onDashboard = /^\/dashboard$/i.test(window.location.pathname);
+        const projectMatch = String(path || "").match(/^\/projects\/([a-z0-9_-]+)/i);
+
+        if (onDashboard && projectMatch?.[1]) {
+            const url = new URL(window.location.href);
+            url.pathname = "/Dashboard";
+            url.searchParams.set("project", projectMatch[1]);
+            window.history.replaceState({}, "", url.toString());
+            return;
+        }
+
         if (window.location.pathname !== path) {
             window.history.pushState({}, "", path);
         }
@@ -477,7 +488,8 @@
             }
         });
 
-        const routeProject = window.location.pathname.match(/^\/projects\/([a-z0-9]+)/i)?.[1];
+        const queryProject = new URLSearchParams(window.location.search).get("project");
+        const routeProject = queryProject || window.location.pathname.match(/^\/projects\/([a-z0-9_-]+)/i)?.[1];
         if (routeProject) activeProjectId = routeProject;
 
         updateNavUser();
