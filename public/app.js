@@ -37,8 +37,6 @@
         const panel = document.getElementById("projects-panel");
         if (!btn || !panel) return;
 
-        btn.textContent = panel.classList.contains("hidden") ? "Show Projects" : "Hide Projects";
-
         btn.addEventListener("click", () => {
             const collapsed = panel.classList.toggle("hidden");
             btn.textContent = collapsed ? "Show Projects" : "Hide Projects";

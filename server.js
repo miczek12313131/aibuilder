@@ -273,11 +273,7 @@ app.get(["/Purchase", "/purchase", "/Purchases", "/purchases"], (_req, res) => {
     res.sendFile(path.join(__dirname, "public", "purchase.html"));
 });
 
-app.get("/projects/:id", (_req, res) => {
-    res.sendFile(path.join(__dirname, "public", "dashboard.html"));
-});
-
-app.get("/success", (_req, res) => {
+app.get(["/success", "/projects/:id"], (_req, res) => {
     res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
