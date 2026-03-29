@@ -4,156 +4,286 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>RoScripter Dashboard</title>
+
   <script src="https://cdn.tailwindcss.com"></script>
+
+  <script>
+    window.DEBUG_MODE = true;
+
+    const Debug = {
+      logs: [],
+      max: 200,
+
+      push(type, msg, data) {
+        const entry = {
+          time: new Date().toLocaleTimeString(),
+          type,
+          msg,
+          data
+        };
+
+        this.logs.push(entry);
+        if (this.logs.length > this.max) this.logs.shift();
+
+        console.log(`[RoScripter:${type}]`, msg, data || "");
+        this.render();
+      },
+
+      render() {
+        const box = document.getElementById("debug-console");
+        if (!box) return;
+
+        box.innerHTML = this.logs.slice(-20).map(l => `
+          <div>
+            <span style="color:#888">[${l.time}]</span>
+            <b>${l.type}</b> ${l.msg}
+          </div>
+        `).join("");
+
+        box.scrollTop = box.scrollHeight;
+      }
+    };
+
+    function initDebugUI() {
+      const box = document.createElement("div");
+      box.id = "debug-console";
+
+      box.style.cssText = `
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        width: 380px;
+        height: 240px;
+        overflow: auto;
+        background: rgba(0,0,0,0.88);
+        color: #00ff88;
+        font-size: 11px;
+        padding: 10px;
+        z-index: 999999;
+        border-radius: 12px;
+        font-family: monospace;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+      `;
+
+      document.addEventListener("DOMContentLoaded", () => {
+        document.body.appendChild(box);
+        Debug.push("INIT", "Debug system online 💀");
+      });
+    }
+
+    initDebugUI();
+
+    // 🔥 GLOBAL ERROR TRACKING
+    window.addEventListener("error", (e) => {
+      Debug.push("ERROR", e.message, {
+        file: e.filename,
+        line: e.lineno,
+        col: e.colno
+      });
+    });
+
+    window.addEventListener("unhandledrejection", (e) => {
+      Debug.push("PROMISE", e.reason?.message || "unknown", e.reason);
+    });
+
+  </script>
+
   <script>
     tailwind.config = {
       theme: {
         extend: {
-          fontFamily: {
-            sans: ['Inter', 'sans-serif'],
-          },
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
           colors: {
             brand: {
-              50: '#ecfeff',
-              100: '#cffafe',
-              200: '#a5f3fc',
-              300: '#67e8f9',
-              400: '#22d3ee',
-              500: '#06b6d4',
-              600: '#0891b2',
-              700: '#0e7490',
-              800: '#155e75',
-              900: '#164e63',
+              600: '#0891b2'
             }
           }
         }
       }
     }
   </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    .glass {
-      background: rgba(255, 255, 255, 0.72);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-    }
-    .glass-dark {
-      background: rgba(17, 24, 39, 0.82);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-    }
-    .mesh-bg {
-      background-color: #ffffff;
-      background-image: radial-gradient(at 40% 20%, hsla(190,100%,94%,1) 0px, transparent 50%),
-                        radial-gradient(at 80% 0%, hsla(190,100%,90%,1) 0px, transparent 50%),
-                        radial-gradient(at 0% 50%, hsla(190,100%,96%,1) 0px, transparent 50%),
-                        radial-gradient(at 80% 50%, hsla(190,100%,92%,1) 0px, transparent 50%),
-                        radial-gradient(at 0% 100%, hsla(190,100%,88%,1) 0px, transparent 50%);
-    }
-  </style>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
 </head>
-<body class="h-screen overflow-hidden font-sans antialiased text-gray-900 dark:text-white mesh-bg dark:bg-gray-900">
 
-<!-- 🔐 AUTH OVERLAY -->
-<div id="auth-view" class="absolute inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-  <div class="max-w-xl w-full glass dark:glass-dark rounded-2xl shadow-xl border border-white/40 dark:border-gray-700 p-5">
-    <p class="text-sm mb-3">Verify your Roblox account</p>
+<body class="h-screen overflow-hidden font-sans bg-gray-100">
 
-    <div id="auth-step-lookup" class="space-y-3">
-      <input id="roblox-username-input" type="text" placeholder="Roblox username"
-        class="w-full rounded-xl border px-3 py-2 text-sm bg-white/80 dark:bg-gray-900" />
-      <button id="roblox-connect-btn" class="rounded-xl bg-brand-600 text-white px-4 py-2 text-sm">
-        Start verification
-      </button>
-    </div>
-     <div id="auth-step-verify" class="hidden mt-3 rounded-xl border p-3 text-xs">
-        <p>Target: <strong>@<span id="auth-verify-username"></span></strong></p>
-        <p class="mt-2">Add this code to your Roblox bio:</p>
-        <code id="auth-verify-code" class="block mt-1 rounded border p-1.5 bg-gray-50 dark:bg-gray-900"></code>
-        <div class="mt-3 flex gap-2">
-          <button id="roblox-verify-btn" class="rounded-xl bg-brand-600 text-white px-3 py-1.5">Verify now</button>
-          <button id="roblox-verify-cancel-btn" class="rounded-xl border px-3 py-1.5">Use different username</button>
-        </div>
-       <p id="auth-error" class="hidden text-red-500 text-sm mt-2"></p>
-     </div>
+<!-- 🔐 AUTH -->
+<div id="auth-view" class="absolute inset-0 flex items-center justify-center bg-black/30">
+  <div class="bg-white p-5 rounded-xl w-[420px]">
+
+    <p class="text-sm mb-3">Verify Roblox account</p>
+
+    <input id="roblox-username-input"
+      class="w-full border px-3 py-2 rounded mb-2 text-sm"
+      placeholder="Username" />
+
+    <button id="roblox-connect-btn"
+      class="w-full bg-cyan-600 text-white py-2 rounded text-sm">
+      Start verification
+    </button>
+
+    <p id="auth-error" class="text-red-500 text-xs mt-2 hidden"></p>
+
   </div>
 </div>
-  
 
-<!-- 🔥 APP -->
+<!-- 🧠 APP -->
 <div class="h-full flex flex-col">
 
-  <!-- 🔝 HEADER -->
-  <header class="h-14 shrink-0 border-b bg-white/90 dark:bg-gray-800/90 backdrop-blur px-4 flex items-center justify-between">
-    <span class="font-bold text-brand-600">RoScripter</span>
-    <div class="flex gap-3 items-center">
-      <a href="/Purchase" class="text-xs font-semibold">Purchase</a>
-      <button class="text-xs">Log out</button>
-    </div>
+  <header class="h-12 flex items-center justify-between px-4 bg-white border-b">
+    <b>RoScripter</b>
+    <button id="roblox-logout-btn" class="text-xs">Logout</button>
   </header>
 
-  <!-- 🧠 MAIN -->
   <div class="flex flex-1 overflow-hidden">
 
-    <!-- 📌 SIDEBAR (NOW REAL SIDE PANEL) -->
-    <aside class="w-64 shrink-0 border-r bg-white dark:bg-gray-800 flex flex-col">
+    <!-- SIDEBAR -->
+    <aside class="w-64 bg-white border-r flex flex-col">
+      <div class="p-3">
+        <input id="new-project-name"
+          class="w-full border px-2 py-1 text-xs rounded"
+          placeholder="New project" />
 
-      <div class="p-3 border-b">
-        <div class="flex items-center gap-2">
-          <img id="studio-avatar" class="w-10 h-10 rounded-full" src="" alt="" />
-          <div>
-            <div id="studio-display-name" class="text-sm font-semibold"></div>
-            <div id="studio-user-id" class="text-xs text-gray-500"></div>
-          </div>
-        </div>
+        <button id="new-project-btn"
+          class="w-full mt-2 bg-cyan-600 text-white text-xs py-1 rounded">
+          New
+        </button>
       </div>
 
-      <div class="p-3 flex flex-col flex-1">
-        <div class="text-[11px] uppercase text-gray-500 mb-2">Projects</div>
-
-        <div class="flex gap-2 mb-2">
-          <input id="new-project-name" type="text" placeholder="New project" class="w-full rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-1 text-xs bg-white/90 dark:bg-gray-900" />
-          <button id="new-project-btn" class="rounded-lg bg-brand-600 text-white text-xs px-2">New</button>
-        </div>
-
-        <!-- 🔥 SCROLLABLE -->
-        <div id="project-list" class="flex-1 overflow-auto text-xs text-gray-500">
-        </div>
-      </div>
-    <!--         <div id="ai-chat-history" class="flex-1 overflow-auto p-4"></div> -->
+      <div id="project-list" class="p-2 text-xs overflow-auto"></div>
     </aside>
 
-    <!-- 💬 CHAT -->
+    <!-- CHAT -->
     <div class="flex-1 flex flex-col">
 
-      <!-- 🧠 ONLY THIS SCROLLS -->
-      <div id="ai-chat-history" class="flex-1 overflow-y-auto p-4 space-y-2">
-        <p class="text-xs text-gray-500">
-          Create/select a project and send a prompt to start chatting.
-        </p>
-      </div>
+      <div id="ai-chat-history" class="flex-1 p-3 overflow-auto text-xs"></div>
 
-      <!-- ⌨️ FIXED INPUT -->
-      <div class="shrink-0 border-t bg-white dark:bg-gray-800 px-3 py-2">
-        <div class="flex items-end gap-2">
-          
-          <textarea id="ai-prompt" rows="2"
-            class="flex-1 resize-none rounded border px-3 py-2 text-sm"
-            placeholder="Message RoScripter AI..."></textarea>
+      <div class="p-2 border-t bg-white flex gap-2">
+        <textarea id="ai-prompt"
+          class="flex-1 border rounded p-2 text-xs"
+          placeholder="message..."></textarea>
 
-          <select id="ai-model" class="rounded border px-2 py-2 text-xs">
-          </select>
-
-          <button id="ai-send-btn" class="bg-brand-600 text-white px-4 py-2 text-sm rounded">
-            Send
-          </button>
-
-        </div>
+        <button id="ai-send-btn"
+          class="bg-cyan-600 text-white px-3 rounded text-xs">
+          Send
+        </button>
       </div>
 
     </div>
   </div>
 </div>
+
+<script>
+(function () {
+
+  let projects = [];
+  let activeProjectId = null;
+
+  const el = (id) => document.getElementById(id);
+
+  const Debug = window.Debug || {
+    push: () => {}
+  };
+
+  // ---------------- AUTH ----------------
+  el("roblox-connect-btn")?.addEventListener("click", async () => {
+    Debug.push("CLICK", "connect");
+
+    const username = el("roblox-username-input")?.value?.trim();
+    if (!username) return;
+
+    try {
+      Debug.push("API", "lookup", { username });
+
+      const res = await fetch("/api/roblox/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username })
+      });
+
+      const data = await res.json();
+
+      Debug.push("API_OK", "lookup success", data);
+
+    } catch (e) {
+      Debug.push("API_FAIL", "lookup failed", e);
+    }
+  });
+
+  // ---------------- PROJECTS ----------------
+  async function loadProjects() {
+    Debug.push("STATE", "loading projects");
+
+    const res = await fetch("/api/projects");
+    const data = await res.json();
+
+    projects = data.projects || [];
+
+    Debug.push("STATE_OK", "projects loaded", {
+      count: projects.length
+    });
+
+    renderProjects();
+  }
+
+  function renderProjects() {
+    const list = el("project-list");
+    if (!list) return;
+
+    list.innerHTML = projects.map(p => `
+      <div onclick="openProject('${p.id}')" style="padding:4px;cursor:pointer;">
+        📁 ${p.name}
+      </div>
+    `).join("");
+
+    Debug.push("UI", "projects rendered");
+  }
+
+  window.openProject = async (id) => {
+    Debug.push("CLICK", "open project", { id });
+
+    activeProjectId = id;
+
+    const res = await fetch(`/api/projects/${id}`);
+    const data = await res.json();
+
+    Debug.push("API_OK", "project loaded", data);
+
+  };
+
+  // ---------------- CHAT ----------------
+  el("ai-send-btn")?.addEventListener("click", async () => {
+    const prompt = el("ai-prompt")?.value;
+    if (!prompt) return;
+
+    Debug.push("CHAT", "sending", { prompt });
+
+    try {
+      const res = await fetch(`/api/projects/${activeProjectId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt })
+      });
+
+      const data = await res.json();
+
+      Debug.push("CHAT_OK", "response received", data);
+
+    } catch (e) {
+      Debug.push("CHAT_FAIL", "message failed", e);
+    }
+  });
+
+  document.addEventListener("DOMContentLoaded", () => {
+    Debug.push("INIT", "app started");
+
+    loadProjects();
+  });
+
+})();
+</script>
+
+</body>
 </html>
