@@ -295,27 +295,35 @@
     }
 }
 
-    async function verifyRoblox() {
-        if (!pendingVerification) return;
+   async function verifyRoblox() {
+    if (!pendingVerification) return;
 
-        try {
-            const r = await fetch("/api/roblox/challenge/verify", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ challengeId: pendingVerification.challengeId })
-            });
+    try {
+        const r = await fetch("/api/roblox/challenge/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                challengeId: pendingVerification.challengeId,
+                code: pendingVerification.code
+            })
+        });
 
-            const d = await r.json();
+        const d = await r.json();
+        console.log("VERIFY RESPONSE:", d);
 
-            saveUser(d);
-            pendingVerification = null;
+        if (!r.ok) throw new Error(d.error || "Verify failed");
 
-            sync();
-            window.showToast?.("verified");
-        } catch {
-            window.showToast?.("verify failed");
-        }
+        saveUser(d);
+        pendingVerification = null;
+
+        sync();
+        window.showToast?.("verified 🔥");
+
+    } catch (e) {
+        console.error("verify error:", e);
+        window.showToast?.("verify failed");
     }
+}
 
     function logout() {
         clearUser();
