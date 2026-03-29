@@ -218,7 +218,7 @@
             const map = [
                 ["buy-pro-btn", links.pro],
                 ["buy-500-btn", links.credits500],
-                ["buy-1200-btn", links.credits1200],
+                ["buy-1220-btn", links.credits1220 || links.credits1200],
             ];
             map.forEach(([id, href]) => {
                 const a = document.getElementById(id);
