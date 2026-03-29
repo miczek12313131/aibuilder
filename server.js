@@ -263,56 +263,8 @@ app.post("/api/projects/:id/messages", async (req, res) => {
 
 app.use(express.static("public"));
 
-app.get("/Dashboard", (_req, res) => {
-    res.sendFile(path.join(__dirname, "public", "dashboard.html"));
-});
-
-app.get("/dashboard", (_req, res) => {
-    res.sendFile(path.join(__dirname, "public", "dashboard.html"));
-});
-
-app.get("/Purchase", (_req, res) => {
-    res.sendFile(path.join(__dirname, "public", "purchase.html"));
-});
-
-app.get("/purchase", (_req, res) => {
-    res.sendFile(path.join(__dirname, "public", "purchase.html"));
-});
-
-app.get(["/success", "/projects/:id", "/Dashboard", "/dashboard"], (_req, res) => {
-    res.sendFile(path.join(__dirname, "public", "dashboard.html"));
-});
-
-app.get(/^\/(dashboard)(\/.*)?$/i, (_req, res) => {
-    res.sendFile(path.join(__dirname, "public", "dashboard.html"));
-});
-
-app.get(["/Purchase", "/Purchases", "/purchase", "/purchases"], (_req, res) => {
-    res.sendFile(path.join(__dirname, "public", "purchase.html"));
-});
-
-app.get(/^\/(purchase|purchases)(\/.*)?$/i, (_req, res) => {
-    res.sendFile(path.join(__dirname, "public", "purchase.html"));
-});
-
-app.get("/", (_req, res) => {
+app.get(["/success", "/projects/:id"], (_req, res) => {
     res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
-app.use((req, res, next) => {
-    if (req.method !== "GET") {
-        return next();
-    }
-
-    const pathName = String(req.path || "").toLowerCase();
-    if (pathName.startsWith("/dashboard")) {
-        return res.sendFile(path.join(__dirname, "public", "dashboard.html"));
-    }
-    if (pathName.startsWith("/purchase") || pathName.startsWith("/purchases")) {
-        return res.sendFile(path.join(__dirname, "public", "purchase.html"));
-    }
-
-    return next();
 });
 
 app.listen(3000, () => {
