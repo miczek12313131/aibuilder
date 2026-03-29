@@ -188,29 +188,79 @@
   };
 
   // ---------------- AUTH ----------------
-  el("roblox-connect-btn")?.addEventListener("click", async () => {
-    Debug.push("CLICK", "connect");
+el("roblox-connect-btn")?.addEventListener("click", async () => {
+    Debug.push("CLICK", "Start Verification button pressed");
 
-    const username = el("roblox-username-input")?.value?.trim();
-    if (!username) return;
+    const input = el("roblox-username-input");
+    const username = input?.value?.trim();
+
+    Debug.push("INPUT", "username captured", { username });
+
+    if (!username) {
+        Debug.push("VALIDATION_FAIL", "username empty");
+        return;
+    }
 
     try {
-      Debug.push("API", "lookup", { username });
+        Debug.push("API", "STEP 1 lookup starting", { username });
 
-      const res = await fetch("/api/roblox/lookup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username })
-      });
+        const lookupRes = await fetch("/api/roblox/lookup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username })
+        });
 
-      const data = await res.json();
+        Debug.push("API_STATUS", "lookup response received", {
+            ok: lookupRes.ok,
+            status: lookupRes.status
+        });
 
-      Debug.push("API_OK", "lookup success", data);
+        const lookup = await lookupRes.json();
+        Debug.push("API_OK", "lookup parsed", lookup);
+
+        Debug.push("API", "STEP 2 challenge start");
+
+        const challengeRes = await fetch("/api/roblox/challenge/start", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                userId: lookup.userId,
+                username: lookup.username
+            })
+        });
+
+        Debug.push("API_STATUS", "challenge response received", {
+            ok: challengeRes.ok,
+            status: challengeRes.status
+        });
+
+        const challenge = await challengeRes.json();
+        Debug.push("API_OK", "challenge created", challenge);
+
+        // UI state switch
+        Debug.push("UI", "switching to verification step");
+
+        el("auth-step-lookup")?.classList.add("hidden");
+        el("auth-step-verify")?.classList.remove("hidden");
+
+        el("auth-verify-code").textContent = challenge.code;
+        el("auth-verify-username").textContent = lookup.username;
+
+        Debug.push("UI_OK", "verification screen ready");
 
     } catch (e) {
-      Debug.push("API_FAIL", "lookup failed", e);
+        Debug.push("ERROR", "verification flow failed", {
+            message: e.message,
+            stack: e.stack
+        });
+
+        const err = el("auth-error");
+        if (err) {
+            err.textContent = "Verification failed. Check debug console.";
+            err.classList.remove("hidden");
+        }
     }
-  });
+});
 
   // ---------------- PROJECTS ----------------
   async function loadProjects() {
