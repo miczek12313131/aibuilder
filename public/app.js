@@ -428,7 +428,15 @@
         const sel = document.getElementById("ai-model");
         const btn = document.getElementById("ai-send-btn");
         const prompt = (ta?.value || "").trim();
-        if (!prompt || !activeProjectId) return;
+        if (!prompt) return;
+
+        if (!activeProjectId) {
+            await createProject();
+        }
+        if (!activeProjectId) {
+            window.showToast?.("Create a project first.");
+            return;
+        }
 
         const provider = sel?.value || "openai";
         if (btn) {
@@ -481,6 +489,12 @@
         document.getElementById("roblox-logout-btn")?.addEventListener("click", onLogout);
         document.getElementById("ai-send-btn")?.addEventListener("click", onSendPrompt);
         document.getElementById("new-project-btn")?.addEventListener("click", () => createProject().catch((e) => window.showToast?.(e.message || "Failed to create project")));
+        document.getElementById("new-project-name")?.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                createProject().catch((err) => window.showToast?.(err.message || "Failed to create project"));
+            }
+        });
         document.getElementById("ai-prompt")?.addEventListener("keydown", (e) => {
             if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
