@@ -13,95 +13,21 @@
     let projects = [];
     let activeProjectId = null;
 
+    let projectRequestToken = 0;
 
-    function getStoredCredits() {
-        try {
-            const raw = localStorage.getItem(CREDITS_KEY);
-            if (raw == null || raw === "") return null;
-            const n = Number(raw);
-            return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : null;
-        } catch (_) {
-            return null;
-        }
-    }
+    window.DEBUG = true;
+    const log = (...args) => window.DEBUG && console.log("[RoScripter]", ...args);
 
-    function renderCreditsPill() {
-        const el = document.getElementById("credits-pill");
-        if (!el) return;
-        const credits = getStoredCredits();
-        el.textContent = `Credits: ${credits == null ? "--" : credits}`;
-    }
-
-    function bindProjectsPanelToggle() {
-        const btn = document.getElementById("toggle-projects-btn");
-        const panel = document.getElementById("projects-panel");
-        if (!btn || !panel) return;
-
-        btn.textContent = panel.classList.contains("hidden") ? "Show Projects" : "Hide Projects";
-
-        btn.addEventListener("click", () => {
-            const collapsed = panel.classList.toggle("hidden");
-            btn.textContent = collapsed ? "Show Projects" : "Hide Projects";
-        });
-    }
-
-
-    function isDashboardRoute() {
-        return /^\/dashboard$/i.test(window.location.pathname) || /^\/projects\//i.test(window.location.pathname);
-    }
-
-    function getStoredUser() {
-        try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            if (!raw) return null;
-            const u = JSON.parse(raw);
-            if (u && typeof u.userId === "number" && u.username) return u;
-        } catch (_) {}
-        return null;
-    }
-
-    function saveUser(payload) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    }
-
-    function clearUser() {
-        localStorage.removeItem(STORAGE_KEY);
-    }
-
-    function showAuthView() {
-        if (isDashboardRoute()) {
-            const url = new URL(window.location.origin + "/");
-            url.searchParams.set("openLogin", "1");
-            window.location.href = url.toString();
-            return;
-        }
-        document.getElementById("auth-view")?.classList.remove("hidden");
-        document.getElementById("studio-view")?.classList.add("hidden");
-    }
-
-    function showStudioView() {
-        document.getElementById("auth-view")?.classList.add("hidden");
-        document.getElementById("studio-view")?.classList.remove("hidden");
-    }
-
-    function updateNavUser() {
-        const slot = document.getElementById("nav-user-slot");
-        if (!slot) return;
-        const u = getStoredUser();
-        if (!u) {
-            slot.classList.add("hidden");
-            slot.classList.remove("flex");
-            slot.innerHTML = "";
-            return;
-        }
-        slot.classList.remove("hidden");
-        slot.classList.add("flex");
-        slot.innerHTML = `<img src="${avatarUrlForUser(u)}" alt="" class="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-600 object-cover" width="32" height="32" /><span class="text-sm font-medium text-gray-700 dark:text-gray-200 max-w-[120px] truncate">${escapeHtml(u.name || u.username)}</span>`;
+    // ---------------- SAFE DOM ----------------
+    function el(id) {
+        const node = document.getElementById(id);
+        if (!node) log("Missing element:", id);
+        return node;
     }
 
     function escapeHtml(s) {
         const d = document.createElement("div");
-        d.textContent = s;
+        d.textContent = String(s ?? "");
         return d.innerHTML;
     }
 
@@ -111,438 +37,338 @@
         return `https://ui-avatars.com/api/?name=${encodeURIComponent(u.username)}&background=0891b2&color=fff&size=128`;
     }
 
-    function resetAuthUi() {
-        const err = document.getElementById("auth-error");
-        if (err) {
-            err.classList.add("hidden");
-            err.textContent = "";
+    // ---------------- STORAGE ----------------
+    const getStoredUser = () => {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            return raw ? JSON.parse(raw) : null;
+        } catch {
+            return null;
         }
-        document.getElementById("auth-step-lookup")?.classList.remove("hidden");
-        document.getElementById("auth-step-verify")?.classList.add("hidden");
-        pendingVerification = null;
+    };
+
+    const saveUser = (u) => localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
+    const clearUser = () => localStorage.removeItem(STORAGE_KEY);
+
+    const getStoredCredits = () => {
+        const raw = localStorage.getItem(CREDITS_KEY);
+        const n = Number(raw);
+        return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : null;
+    };
+
+    // ---------------- UI ----------------
+    function showAuth() {
+        el("auth-view")?.classList.remove("hidden");
+        el("studio-view")?.classList.add("hidden");
     }
 
-    function renderVerificationStep() {
-        document.getElementById("auth-step-lookup")?.classList.add("hidden");
-        document.getElementById("auth-step-verify")?.classList.remove("hidden");
-        const code = document.getElementById("auth-verify-code");
-        const username = document.getElementById("auth-verify-username");
-        if (code) code.textContent = pendingVerification?.code || "";
-        if (username) username.textContent = pendingVerification?.username || "";
+    function showStudio() {
+        el("auth-view")?.classList.add("hidden");
+        el("studio-view")?.classList.remove("hidden");
     }
 
-    function setPath(path) {
-        const onDashboard = /^\/dashboard$/i.test(window.location.pathname);
-        const projectMatch = String(path || "").match(/^\/projects\/([a-z0-9_-]+)/i);
+    function renderCredits() {
+        const pill = el("credits-pill");
+        if (pill) pill.textContent = `Credits: ${getStoredCredits() ?? "--"}`;
+    }
 
-        if (onDashboard && projectMatch?.[1]) {
-            const url = new URL(window.location.href);
-            url.pathname = "/Dashboard";
-            url.searchParams.set("project", projectMatch[1]);
-            window.history.replaceState({}, "", url.toString());
+    function updateNavUser() {
+        const slot = el("nav-user-slot");
+        const u = getStoredUser();
+
+        if (!slot) return;
+
+        if (!u) {
+            slot.classList.add("hidden");
+            slot.innerHTML = "";
             return;
         }
 
-        if (window.location.pathname !== path) {
-            window.history.pushState({}, "", path);
-        }
+        slot.classList.remove("hidden");
+        slot.innerHTML = `
+            <img src="${avatarUrlForUser(u)}" class="w-8 h-8 rounded-full border object-cover"/>
+            <span class="text-sm font-medium truncate max-w-[120px]">
+                ${escapeHtml(u.name || u.username)}
+            </span>
+        `;
     }
 
-    function renderProjectTabs() {
-        const list = document.getElementById("project-list");
+    // ---------------- PROJECTS ----------------
+    function getActiveProject() {
+        return projects.find(p => p.id === activeProjectId);
+    }
+
+    function renderProjects() {
+        const list = el("project-list");
         if (!list) return;
 
         if (!projects.length) {
-            list.innerHTML = '<p class="text-xs text-gray-500 dark:text-gray-400">No projects yet.</p>';
+            list.innerHTML = `<p class="text-xs opacity-60">No projects yet.</p>`;
             return;
         }
 
-        list.innerHTML = projects
-            .map((project) => {
-                const active = project.id === activeProjectId;
-                return `<button data-project-id="${project.id}" class="project-tab w-full text-left rounded-lg px-2 py-1.5 text-xs ${
-                    active
-                        ? "bg-brand-100 text-brand-800 dark:bg-brand-900/30 dark:text-brand-200"
-                        : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
-                }">${escapeHtml(project.name)}</button>`;
-            })
-            .join("");
+        list.innerHTML = projects.map(p => `
+            <button data-id="${p.id}" class="project-tab w-full text-left px-2 py-1.5 text-xs rounded
+                ${p.id === activeProjectId ? "bg-blue-500 text-white" : "bg-gray-200 dark:bg-gray-700"}">
+                ${escapeHtml(p.name)}
+            </button>
+        `).join("");
 
-        document.querySelectorAll(".project-tab").forEach((btn) => {
-            btn.addEventListener("click", () => {
-                const id = btn.getAttribute("data-project-id");
-                openProject(id);
-            });
+        list.querySelectorAll(".project-tab").forEach(btn => {
+            btn.onclick = () => openProject(btn.dataset.id);
         });
     }
 
-    function getActiveProject() {
-        return projects.find((p) => p.id === activeProjectId) || null;
-    }
+    function renderChat() {
+        const chat = el("ai-chat-history");
+        const title = el("active-project-name");
 
-    function renderActiveProjectChat() {
-        const title = document.getElementById("active-project-name");
-        const chat = document.getElementById("ai-chat-history");
         const project = getActiveProject();
 
-        if (title) {
-            title.textContent = project ? project.name : "No project selected";
-        }
+        if (title) title.textContent = project?.name || "No project selected";
         if (!chat) return;
 
-        if (!project || !Array.isArray(project.messages) || !project.messages.length) {
-            chat.innerHTML = '<p class="text-xs text-gray-500 dark:text-gray-400">Create/select a project and send a prompt to start chatting.</p>';
+        if (!project?.messages?.length) {
+            chat.innerHTML = `<p class="text-xs opacity-60">Start chatting...</p>`;
             return;
         }
 
-        chat.innerHTML = project.messages
-            .map((item) => {
-                const bubbleBase = "max-w-[85%] rounded-xl px-3 py-2 text-xs whitespace-pre-wrap break-words";
-                const bubbleClass =
-                    item.role === "user"
-                        ? `${bubbleBase} ml-auto bg-brand-600 text-white`
-                        : `${bubbleBase} mr-auto bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-gray-100`;
-                return `<div class="mb-2"><div class="${bubbleClass}">${escapeHtml(item.content || "")}</div></div>`;
-            })
-            .join("");
+        chat.innerHTML = project.messages.map(m => {
+            const isUser = m.role === "user";
+            return `
+                <div class="mb-2">
+                    <div class="max-w-[85%] px-3 py-2 rounded text-xs whitespace-pre-wrap break-words
+                        ${isUser ? "ml-auto bg-blue-600 text-white" : "mr-auto bg-gray-200 dark:bg-gray-700"}">
+                        ${escapeHtml(m.content)}
+                    </div>
+                </div>
+            `;
+        }).join("");
+
         chat.scrollTop = chat.scrollHeight;
     }
 
-    async function fetchProject(projectId) {
-        const res = await fetch(`/api/projects/${projectId}`);
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || res.statusText);
-        return data.project;
+    async function fetchProject(id) {
+        const r = await fetch(`/api/projects/${id}`);
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || "Failed project fetch");
+        return d.project;
     }
 
     async function refreshProjects() {
-        const res = await fetch("/api/projects");
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || res.statusText);
+        const token = ++projectRequestToken;
 
-        const previous = activeProjectId;
-        projects = data.projects || [];
+        const r = await fetch("/api/projects");
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || "Failed projects");
+
+        projects = d.projects || [];
+
         if (!activeProjectId && projects.length) {
             activeProjectId = projects[0].id;
-        } else if (activeProjectId && !projects.some((p) => p.id === activeProjectId)) {
-            activeProjectId = projects.length ? projects[0].id : null;
         }
 
-        renderProjectTabs();
+        renderProjects();
+
         if (activeProjectId) {
             const full = await fetchProject(activeProjectId);
-            projects = projects.map((p) => (p.id === full.id ? full : p));
-        }
-        renderActiveProjectChat();
+            if (token !== projectRequestToken) return;
 
-        if (previous !== activeProjectId && activeProjectId) {
-            setPath(`/projects/${activeProjectId}`);
+            const idx = projects.findIndex(p => p.id === full.id);
+            if (idx >= 0) projects[idx] = full;
+
+            renderChat();
         }
     }
 
-    async function openProject(projectId) {
-        if (!projectId) return;
-        activeProjectId = projectId;
-        const full = await fetchProject(projectId);
-        projects = projects.map((p) => (p.id === full.id ? full : p));
-        if (!projects.some((p) => p.id === full.id)) projects.unshift(full);
-        renderProjectTabs();
-        renderActiveProjectChat();
-        setPath(`/projects/${projectId}`);
+    async function openProject(id) {
+        activeProjectId = id;
+        const full = await fetchProject(id);
+
+        const idx = projects.findIndex(p => p.id === id);
+        if (idx >= 0) projects[idx] = full;
+        else projects.unshift(full);
+
+        renderProjects();
+        renderChat();
+
+        history.pushState({}, "", `/projects/${id}`);
     }
 
     async function createProject() {
-        const nameInput = document.getElementById("new-project-name");
-        const name = (nameInput?.value || "").trim() || `Project ${projects.length + 1}`;
-        const res = await fetch("/api/projects", {
+        const input = el("new-project-name");
+        const name = (input?.value || "").trim() || `Project ${projects.length + 1}`;
+
+        const r = await fetch("/api/projects", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name }),
+            body: JSON.stringify({ name })
         });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || res.statusText);
-        if (nameInput) nameInput.value = "";
+
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || "Create failed");
+
         await refreshProjects();
-        await openProject(data.project.id);
+        await openProject(d.project.id);
     }
 
-    async function loadPurchaseLinks() {
+    // ---------------- CHAT ----------------
+    async function sendPrompt() {
+        const ta = el("ai-prompt");
+        const btn = el("ai-send-btn");
+
+        const prompt = (ta?.value || "").trim();
+        if (!prompt || !activeProjectId) return;
+
+        btn && (btn.disabled = true);
+
         try {
-            const res = await fetch("/api/purchases/links");
-            const links = await res.json();
-            const map = [
-                ["buy-pro-btn", links.pro],
-                ["buy-500-btn", links.credits500],
-                ["buy-1220-btn", links.credits1220 || links.credits1200],
-            ];
-            map.forEach(([id, href]) => {
-                const a = document.getElementById(id);
-                if (!a) return;
-                if (!href) {
-                    a.classList.add("opacity-50", "pointer-events-none");
-                    a.title = "Checkout link not configured";
-                    return;
-                }
-                a.href = href;
-            });
-        } catch (_) {}
-    }
-
-    function syncModalToUser() {
-        const u = getStoredUser();
-        renderCreditsPill();
-        resetAuthUi();
-        if (u) {
-            const av = document.getElementById("studio-avatar");
-            const dn = document.getElementById("studio-display-name");
-            const uid = document.getElementById("studio-user-id");
-            if (av) {
-                av.src = avatarUrlForUser(u);
-                av.alt = u.name || u.username;
-            }
-            if (dn) dn.textContent = u.name || u.username;
-            if (uid) uid.textContent = `ID: ${u.userId} · @${u.username}`;
-            showStudioView();
-            refreshProjects().catch(() => {});
-        } else {
-            showAuthView();
-        }
-    }
-
-    window.openAppModal = function openAppModal() {
-        const modal = document.getElementById("app-modal");
-        if (!modal) return;
-        syncModalToUser();
-        modal.classList.remove("hidden");
-        document.body.style.overflow = "hidden";
-        if (window.lucide) lucide.createIcons();
-    };
-
-    window.closeAppModal = function closeAppModal() {
-        const modal = document.getElementById("app-modal");
-        if (!modal) return;
-        modal.classList.add("hidden");
-        document.body.style.overflow = "auto";
-    };
-
-    async function onConnectRoblox() {
-        const input = document.getElementById("roblox-username-input");
-        const errEl = document.getElementById("auth-error");
-        const btn = document.getElementById("roblox-connect-btn");
-        const username = (input?.value || "").trim().replace(/^@+/, "");
-        if (!username) {
-            if (errEl) {
-                errEl.textContent = "Enter your Roblox username.";
-                errEl.classList.remove("hidden");
-            }
-            return;
-        }
-        if (errEl) errEl.classList.add("hidden");
-        if (btn) {
-            btn.disabled = true;
-            btn.textContent = "Preparing…";
-        }
-        try {
-            const lookupRes = await fetch("/api/roblox/lookup", {
+            const r = await fetch(`/api/projects/${activeProjectId}/messages`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ username }),
+                body: JSON.stringify({ prompt, provider: el("ai-model")?.value || "openai" })
             });
-            const lookup = await lookupRes.json().catch(() => ({}));
-            if (!lookupRes.ok) throw new Error(lookup.error || lookupRes.statusText);
 
-            const challengeRes = await fetch("/api/roblox/challenge/start", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ userId: lookup.userId, username: lookup.username }),
-            });
-            const challenge = await challengeRes.json().catch(() => ({}));
-            if (!challengeRes.ok) throw new Error(challenge.error || challengeRes.statusText);
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(d.error || "Send failed");
 
-            pendingVerification = {
-                challengeId: challenge.challengeId,
-                code: challenge.code,
-                userId: lookup.userId,
-                username: lookup.username,
-            };
-            renderVerificationStep();
+            const idx = projects.findIndex(p => p.id === activeProjectId);
+            if (idx >= 0) projects[idx] = d.project;
+
+            renderChat();
+            ta.value = "";
         } catch (e) {
-            if (errEl) {
-                errEl.textContent = e.message || "Could not start verification.";
-                errEl.classList.remove("hidden");
-            }
+            window.showToast?.(e.message);
         } finally {
-            if (btn) {
-                btn.disabled = false;
-                btn.textContent = "Start verification";
-            }
+            btn && (btn.disabled = false);
         }
     }
 
-    async function onVerifyRoblox() {
-        const errEl = document.getElementById("auth-error");
-        const verifyBtn = document.getElementById("roblox-verify-btn");
-        if (!pendingVerification?.challengeId) return;
+    // ---------------- AUTH ----------------
+   async function connectRoblox() {
+    const input = el("roblox-username-input");
+    const username = (input?.value || "").trim().replace(/^@+/, "");
+    if (!username) return;
 
-        if (errEl) errEl.classList.add("hidden");
-        if (verifyBtn) {
-            verifyBtn.disabled = true;
-            verifyBtn.textContent = "Checking…";
+    try {
+        const lookupRes = await fetch("/api/roblox/lookup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username })
+        });
+
+        const lookup = await lookupRes.json();
+        console.log("LOOKUP:", lookup);
+
+        if (!lookup.userId) {
+            throw new Error("Lookup failed");
         }
 
-        try {
-            const res = await fetch("/api/roblox/challenge/verify", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ challengeId: pendingVerification.challengeId }),
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data.error || res.statusText);
+        const challengeRes = await fetch("/api/roblox/challenge/start", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(lookup)
+        });
 
-            saveUser({
-                userId: data.userId,
-                username: data.username,
-                name: data.name,
-                avatarUrl: data.avatarUrl,
-                connectedAt: Date.now(),
-            });
-            pendingVerification = null;
-            syncModalToUser();
-            updateNavUser();
-            if (typeof window.showToast === "function") window.showToast("Roblox account verified.");
-        } catch (e) {
-            if (errEl) {
-                errEl.textContent = e.message || "Could not verify.";
-                errEl.classList.remove("hidden");
-            }
-        } finally {
-            if (verifyBtn) {
-                verifyBtn.disabled = false;
-                verifyBtn.textContent = "Verify now";
-            }
+        const challenge = await challengeRes.json();
+        console.log("CHALLENGE:", challenge);
+
+        if (!challenge.challengeId || !challenge.code) {
+            throw new Error("Challenge failed");
         }
-    }
 
-    function onCancelVerify() {
-        resetAuthUi();
-    }
+        pendingVerification = challenge;
 
-    function onLogout() {
+        const verifyBox = el("auth-step-verify");
+        const lookupBox = el("auth-step-lookup");
+
+        lookupBox?.classList.add("hidden");
+        verifyBox?.classList.remove("hidden");
+
+        // 💥 pokaż kod użytkownikowi (jeśli masz UI)
+        const codeEl = el("challenge-code");
+        if (codeEl) codeEl.textContent = challenge.code;
+
+    } catch (e) {
+        console.error("connectRoblox error:", e);
+        window.showToast?.(e.message || "auth failed");
+    }
+}
+
+   async function verifyRoblox() {
+    if (!pendingVerification) return;
+
+    try {
+        const r = await fetch("/api/roblox/challenge/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                challengeId: pendingVerification.challengeId,
+                code: pendingVerification.code
+            })
+        });
+
+        const d = await r.json();
+        console.log("VERIFY RESPONSE:", d);
+
+        if (!r.ok) throw new Error(d.error || "Verify failed");
+
+        saveUser(d);
+        pendingVerification = null;
+
+        sync();
+        window.showToast?.("verified 🔥");
+
+    } catch (e) {
+        console.error("verify error:", e);
+        window.showToast?.("verify failed");
+    }
+}
+
+    function logout() {
         clearUser();
         projects = [];
         activeProjectId = null;
-        syncModalToUser();
+        sync();
+    }
+
+    // ---------------- SYNC ----------------
+    function sync() {
+        const u = getStoredUser();
+
+        renderCredits();
         updateNavUser();
-        if (typeof window.showToast === "function") window.showToast("Logged out.");
-    }
 
-    async function onSendPrompt() {
-        const ta = document.getElementById("ai-prompt");
-        const sel = document.getElementById("ai-model");
-        const btn = document.getElementById("ai-send-btn");
-        const prompt = (ta?.value || "").trim();
-        if (!prompt) return;
-
-        if (!activeProjectId) {
-            await createProject();
-        }
-        if (!activeProjectId) {
-            window.showToast?.("Create a project first.");
-            return;
-        }
-
-        const provider = sel?.value || "openai";
-        if (btn) {
-            btn.disabled = true;
-            btn.textContent = "…";
-        }
-
-        try {
-            const res = await fetch(`/api/projects/${activeProjectId}/messages`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ prompt, provider }),
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data.error || res.statusText);
-            const idx = projects.findIndex((p) => p.id === activeProjectId);
-            if (idx >= 0) projects[idx] = data.project;
-            renderActiveProjectChat();
-            if (ta) ta.value = "";
-        } catch (e) {
-            if (typeof window.showToast === "function") window.showToast(e.message || "Request failed.");
-        } finally {
-            if (btn) {
-                btn.disabled = false;
-                btn.textContent = "Send";
-            }
+        if (u) {
+            showStudio();
+            refreshProjects().catch(() => {});
+        } else {
+            showAuth();
         }
     }
 
-    function showSuccessIfNeeded() {
-        if (window.location.pathname !== "/success") return;
-        const banner = document.getElementById("purchase-success");
-        if (banner) banner.classList.remove("hidden");
-    }
-
+    // ---------------- INIT ----------------
     document.addEventListener("DOMContentLoaded", () => {
-        const modelSelect = document.getElementById("ai-model");
-        if (modelSelect && modelSelect.options.length === 0) {
-            MODEL_OPTIONS.forEach((o) => {
-                const opt = document.createElement("option");
-                opt.value = o.value;
-                opt.textContent = o.label;
-                modelSelect.appendChild(opt);
-            });
-        }
+        el("roblox-connect-btn")?.addEventListener("click", connectRoblox);
+        el("roblox-verify-btn")?.addEventListener("click", verifyRoblox);
+        el("roblox-logout-btn")?.addEventListener("click", logout);
+        el("ai-send-btn")?.addEventListener("click", sendPrompt);
 
-        document.getElementById("roblox-connect-btn")?.addEventListener("click", onConnectRoblox);
-        document.getElementById("roblox-verify-btn")?.addEventListener("click", onVerifyRoblox);
-        document.getElementById("roblox-verify-cancel-btn")?.addEventListener("click", onCancelVerify);
-        document.getElementById("roblox-logout-btn")?.addEventListener("click", onLogout);
-        document.getElementById("ai-send-btn")?.addEventListener("click", onSendPrompt);
-        document.getElementById("new-project-btn")?.addEventListener("click", () => createProject().catch((e) => window.showToast?.(e.message || "Failed to create project")));
-        document.getElementById("new-project-name")?.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                createProject().catch((err) => window.showToast?.(err.message || "Failed to create project"));
-            }
-        });
-        document.getElementById("ai-prompt")?.addEventListener("keydown", (e) => {
+        el("new-project-btn")?.addEventListener("click", () =>
+            createProject().catch(e => window.showToast?.(e.message))
+        );
+
+        el("ai-prompt")?.addEventListener("keydown", e => {
             if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
-                onSendPrompt();
+                sendPrompt();
             }
         });
 
-        const queryProject = new URLSearchParams(window.location.search).get("project");
-        const routeProject = queryProject || window.location.pathname.match(/^\/projects\/([a-z0-9_-]+)/i)?.[1];
-        if (routeProject) activeProjectId = routeProject;
+        const match = location.pathname.match(/\/projects\/([a-z0-9]+)/i);
+        if (match) activeProjectId = match[1];
 
-        const openLogin = new URLSearchParams(window.location.search).get("openLogin");
-
-        updateNavUser();
-        syncModalToUser();
-        bindProjectsPanelToggle();
-        loadPurchaseLinks();
-        showSuccessIfNeeded();
-
-        if (openLogin === "1" && document.getElementById("app-modal")) {
-            window.openAppModal?.();
-        }
+        sync();
     });
 
-    window.openSignupModal = function openSignupModal() {
-        const user = getStoredUser();
-        if (user) {
-            window.location.href = "/Dashboard";
-            return;
-        }
-        if (document.getElementById("app-modal")) {
-            window.openAppModal?.();
-            return;
-        }
-        window.location.href = "/?openLogin=1";
-    };
-    window.closeSignupModal = window.closeAppModal;
 })();
