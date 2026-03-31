@@ -4,122 +4,336 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>RoScripter Dashboard</title>
+
   <script src="https://cdn.tailwindcss.com"></script>
+
+  <script>
+    window.DEBUG_MODE = true;
+
+    const Debug = {
+      logs: [],
+      max: 200,
+
+      push(type, msg, data) {
+        const entry = {
+          time: new Date().toLocaleTimeString(),
+          type,
+          msg,
+          data
+        };
+
+        this.logs.push(entry);
+        if (this.logs.length > this.max) this.logs.shift();
+
+        console.log(`[RoScripter:${type}]`, msg, data || "");
+        this.render();
+      },
+
+      render() {
+        const box = document.getElementById("debug-console");
+        if (!box) return;
+
+        box.innerHTML = this.logs.slice(-20).map(l => `
+          <div>
+            <span style="color:#888">[${l.time}]</span>
+            <b>${l.type}</b> ${l.msg}
+          </div>
+        `).join("");
+
+        box.scrollTop = box.scrollHeight;
+      }
+    };
+
+    function initDebugUI() {
+      const box = document.createElement("div");
+      box.id = "debug-console";
+
+      box.style.cssText = `
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        width: 380px;
+        height: 240px;
+        overflow: auto;
+        background: rgba(0,0,0,0.88);
+        color: #00ff88;
+        font-size: 11px;
+        padding: 10px;
+        z-index: 999999;
+        border-radius: 12px;
+        font-family: monospace;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+      `;
+
+      document.addEventListener("DOMContentLoaded", () => {
+        document.body.appendChild(box);
+        Debug.push("INIT", "Debug system online 💀");
+      });
+    }
+
+    initDebugUI();
+
+    // 🔥 GLOBAL ERROR TRACKING
+    window.addEventListener("error", (e) => {
+      Debug.push("ERROR", e.message, {
+        file: e.filename,
+        line: e.lineno,
+        col: e.colno
+      });
+    });
+
+    window.addEventListener("unhandledrejection", (e) => {
+      Debug.push("PROMISE", e.reason?.message || "unknown", e.reason);
+    });
+
+  </script>
+
   <script>
     tailwind.config = {
       theme: {
         extend: {
-          fontFamily: {
-            sans: ['Inter', 'sans-serif'],
-          },
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
           colors: {
             brand: {
-              50: '#ecfeff',
-              100: '#cffafe',
-              200: '#a5f3fc',
-              300: '#67e8f9',
-              400: '#22d3ee',
-              500: '#06b6d4',
-              600: '#0891b2',
-              700: '#0e7490',
-              800: '#155e75',
-              900: '#164e63',
+              600: '#0891b2'
             }
           }
         }
       }
     }
   </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    .glass {
-      background: rgba(255, 255, 255, 0.72);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-    }
-    .glass-dark {
-      background: rgba(17, 24, 39, 0.82);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-    }
-    .mesh-bg {
-      background-color: #ffffff;
-      background-image: radial-gradient(at 40% 20%, hsla(190,100%,94%,1) 0px, transparent 50%),
-                        radial-gradient(at 80% 0%, hsla(190,100%,90%,1) 0px, transparent 50%),
-                        radial-gradient(at 0% 50%, hsla(190,100%,96%,1) 0px, transparent 50%),
-                        radial-gradient(at 80% 50%, hsla(190,100%,92%,1) 0px, transparent 50%),
-                        radial-gradient(at 0% 100%, hsla(190,100%,88%,1) 0px, transparent 50%);
-    }
-  </style>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
 </head>
-<body class="h-full font-sans antialiased text-gray-900 dark:text-white mesh-bg dark:bg-gray-900">
-  <div class="h-full flex flex-col">
-    <header class="h-16 shrink-0 border-b border-gray-200/70 dark:border-gray-700 glass dark:glass-dark px-4 sm:px-6 flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <a href="/Purchase" class="rounded-full bg-gradient-to-r from-brand-500 to-brand-600 text-white text-xs font-semibold px-4 py-2 shadow-lg shadow-brand-500/30">Buy Credits</a>
+
+<body class="h-screen overflow-hidden font-sans bg-gray-100">
+
+<!-- 🔐 AUTH -->
+<div id="auth-view" class="absolute inset-0 flex items-center justify-center bg-black/30">
+  <div class="bg-white p-5 rounded-xl w-[420px]">
+
+    <p class="text-sm mb-3">Verify Roblox account</p>
+
+    <input id="roblox-username-input"
+      class="w-full border px-3 py-2 rounded mb-2 text-sm"
+      placeholder="Username" />
+
+    <button id="roblox-connect-btn"
+      class="w-full bg-cyan-600 text-white py-2 rounded text-sm">
+      Start verification
+    </button>
+
+    <p id="auth-error" class="text-red-500 text-xs mt-2 hidden"></p>
+
+  </div>
+</div>
+
+<!-- 🧠 APP -->
+<div class="h-full flex flex-col">
+
+  <header class="h-12 flex items-center justify-between px-4 bg-white border-b">
+    <b>RoScripter</b>
+    <button id="roblox-logout-btn" class="text-xs">Logout</button>
+  </header>
+
+  <div class="flex flex-1 overflow-hidden">
+
+    <!-- SIDEBAR -->
+    <aside class="w-64 bg-white border-r flex flex-col">
+      <div class="p-3">
+        <input id="new-project-name"
+          class="w-full border px-2 py-1 text-xs rounded"
+          placeholder="New project" />
+
+        <button id="new-project-btn"
+          class="w-full mt-2 bg-cyan-600 text-white text-xs py-1 rounded">
+          New
+        </button>
       </div>
-      <button id="roblox-logout-btn" class="text-xs font-semibold text-gray-700 dark:text-gray-200">Log out</button>
-    </header>
 
-    <div id="studio-view" class="hidden flex flex-1 min-h-0 p-3 sm:p-5 gap-3 sm:gap-5">
-      <aside id="projects-panel" class="w-80 shrink-0 glass dark:glass-dark rounded-2xl border border-white/50 dark:border-gray-700 p-3 flex flex-col transition-all duration-150 shadow-lg">
-        <div class="mb-3 flex items-center gap-2">
-          <img id="studio-avatar" class="w-10 h-10 rounded-full border border-white/70" src="" alt="" />
-          <div>
-            <div id="studio-display-name" class="text-sm font-semibold"></div>
-            <div id="studio-user-id" class="text-xs text-gray-500"></div>
-          </div>
-        </div>
-        <div class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">Projects</div>
-        <div class="flex gap-2 mb-2">
-          <input id="new-project-name" type="text" placeholder="New project" class="w-full rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-1 text-xs bg-white/90 dark:bg-gray-900" />
-          <button id="new-project-btn" class="rounded-lg bg-brand-600 text-white text-xs px-2">New</button>
-        </div>
-        <div id="project-list" class="space-y-1 overflow-auto"></div>
-      </aside>
+      <div id="project-list" class="p-2 text-xs overflow-auto"></div>
+    </aside>
 
-      <main class="flex-1 min-w-0 flex flex-col min-h-0 glass dark:glass-dark rounded-2xl border border-white/50 dark:border-gray-700 shadow-lg overflow-hidden">
-        <div class="px-4 py-3 border-b border-gray-200/80 dark:border-gray-700 text-xs font-semibold flex items-center justify-between gap-3">
-          <div class="flex items-center gap-2 min-w-0">
-            <button id="toggle-projects-btn" class="rounded-lg border border-gray-300 dark:border-gray-600 px-2 py-1 text-[11px]">Hide Projects</button>
-            <span class="truncate">Active: <span id="active-project-name"></span></span>
-          </div>
-        </div>
+    <!-- CHAT -->
+    <div class="flex-1 flex flex-col">
 
-        <div id="ai-chat-history" class="flex-1 overflow-auto p-5 pb-28"></div>
+      <div id="ai-chat-history" class="flex-1 p-3 overflow-auto text-xs"></div>
 
+      <div class="p-2 border-t bg-white flex gap-2">
+        <textarea id="ai-prompt"
+          class="flex-1 border rounded p-2 text-xs"
+          placeholder="message..."></textarea>
 
-        <div class="border-t border-gray-200/80 dark:border-gray-700 bg-white/85 dark:bg-gray-800/85 px-3 py-2 mt-auto">
-          <div class="flex items-center gap-2">
-            <textarea id="ai-prompt" rows="2" placeholder="Message RoScripter AI..." class="flex-1 resize-none rounded-lg border border-gray-200 dark:border-gray-700 bg-white/90 dark:bg-gray-900 px-3 py-2 text-sm"></textarea>
-            <div class="flex items-center gap-2 shrink-0">
-              <span id="credits-pill" class="rounded-lg border border-gray-200 dark:border-gray-700 px-2 py-2 text-xs bg-white/90 dark:bg-gray-900">Credits: --</span>
-              <select id="ai-model" class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white/90 dark:bg-gray-900 px-2 py-2 text-xs"></select>
-              <button id="ai-send-btn" class="rounded-lg bg-brand-600 text-white px-4 py-2 text-sm">Send</button>
-            </div>
-          </div>
-        </div>
-      </main>
+        <button id="ai-send-btn"
+          class="bg-cyan-600 text-white px-3 rounded text-xs">
+          Send
+        </button>
+      </div>
+
     </div>
   </div>
+</div>
 
-  <div id="toast" class="fixed bottom-5 right-5 bg-gray-800 text-white px-4 py-2 rounded-lg translate-y-20 opacity-0 transition-all">
-    <span id="toast-message"></span>
-  </div>
+<script>
+(function () {
 
-  <script src="/app.js"></script>
-  <script>
-    function showToast(message) {
-      const toast = document.getElementById('toast');
-      const msg = document.getElementById('toast-message');
-      msg.textContent = message;
-      toast.classList.remove('translate-y-20','opacity-0');
-      setTimeout(() => toast.classList.add('translate-y-20','opacity-0'), 2500);
+  let projects = [];
+  let activeProjectId = null;
+
+  const el = (id) => document.getElementById(id);
+
+  const Debug = window.Debug || {
+    push: () => {}
+  };
+
+  // ---------------- AUTH ----------------
+el("roblox-connect-btn")?.addEventListener("click", async () => {
+    Debug.push("CLICK", "Start Verification button pressed");
+
+    const input = el("roblox-username-input");
+    const username = input?.value?.trim();
+
+    Debug.push("INPUT", "username captured", { username });
+
+    if (!username) {
+        Debug.push("VALIDATION_FAIL", "username empty");
+        return;
     }
-    window.openSignupModal = () => (window.location.href = '/Dashboard');
-    window.closeSignupModal = () => {};
-  </script>
+
+    try {
+        Debug.push("API", "STEP 1 lookup starting", { username });
+
+        const lookupRes = await fetch("/api/roblox/lookup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username })
+        });
+
+        Debug.push("API_STATUS", "lookup response received", {
+            ok: lookupRes.ok,
+            status: lookupRes.status
+        });
+
+        const lookup = await lookupRes.json();
+        Debug.push("API_OK", "lookup parsed", lookup);
+
+        Debug.push("API", "STEP 2 challenge start");
+
+        const challengeRes = await fetch("/api/roblox/challenge/start", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                userId: lookup.userId,
+                username: lookup.username
+            })
+        });
+
+        Debug.push("API_STATUS", "challenge response received", {
+            ok: challengeRes.ok,
+            status: challengeRes.status
+        });
+
+        const challenge = await challengeRes.json();
+        Debug.push("API_OK", "challenge created", challenge);
+
+        // UI state switch
+        Debug.push("UI", "switching to verification step");
+
+        el("auth-step-lookup")?.classList.add("hidden");
+        el("auth-step-verify")?.classList.remove("hidden");
+
+        el("auth-verify-code").textContent = challenge.code;
+        el("auth-verify-username").textContent = lookup.username;
+
+        Debug.push("UI_OK", "verification screen ready");
+
+    } catch (e) {
+        Debug.push("ERROR", "verification flow failed", {
+            message: e.message,
+            stack: e.stack
+        });
+
+        const err = el("auth-error");
+        if (err) {
+            err.textContent = "Verification failed. Check debug console.";
+            err.classList.remove("hidden");
+        }
+    }
+});
+
+  // ---------------- PROJECTS ----------------
+  async function loadProjects() {
+    Debug.push("STATE", "loading projects");
+
+    const res = await fetch("/api/projects");
+    const data = await res.json();
+
+    projects = data.projects || [];
+
+    Debug.push("STATE_OK", "projects loaded", {
+      count: projects.length
+    });
+
+    renderProjects();
+  }
+
+  function renderProjects() {
+    const list = el("project-list");
+    if (!list) return;
+
+    list.innerHTML = projects.map(p => `
+      <div onclick="openProject('${p.id}')" style="padding:4px;cursor:pointer;">
+        📁 ${p.name}
+      </div>
+    `).join("");
+
+    Debug.push("UI", "projects rendered");
+  }
+
+  window.openProject = async (id) => {
+    Debug.push("CLICK", "open project", { id });
+
+    activeProjectId = id;
+
+    const res = await fetch(`/api/projects/${id}`);
+    const data = await res.json();
+
+    Debug.push("API_OK", "project loaded", data);
+
+  };
+
+  // ---------------- CHAT ----------------
+  el("ai-send-btn")?.addEventListener("click", async () => {
+    const prompt = el("ai-prompt")?.value;
+    if (!prompt) return;
+
+    Debug.push("CHAT", "sending", { prompt });
+
+    try {
+      const res = await fetch(`/api/projects/${activeProjectId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt })
+      });
+
+      const data = await res.json();
+
+      Debug.push("CHAT_OK", "response received", data);
+
+    } catch (e) {
+      Debug.push("CHAT_FAIL", "message failed", e);
+    }
+  });
+
+  document.addEventListener("DOMContentLoaded", () => {
+    Debug.push("INIT", "app started");
+
+    loadProjects();
+  });
+
+})();
+</script>
+
 </body>
 </html>
