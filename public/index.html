@@ -102,22 +102,9 @@
         }
     </style>
     <script>
-        // Fallbacks so login modal can still open even before app.js initializes.
+        // Fallback so inline onclick handlers never throw before app.js initializes.
         window.openSignupModal = window.openSignupModal || function () {
-            const modal = document.getElementById('app-modal');
-            if (modal) {
-                modal.classList.remove('hidden');
-                document.body.style.overflow = 'hidden';
-                return;
-            }
             window.location.href = '/?openLogin=1';
-        };
-        window.openAppModal = window.openAppModal || window.openSignupModal;
-        window.closeAppModal = window.closeAppModal || function () {
-            const modal = document.getElementById('app-modal');
-            if (!modal) return;
-            modal.classList.add('hidden');
-            document.body.style.overflow = 'auto';
         };
     </script>
 </head>
