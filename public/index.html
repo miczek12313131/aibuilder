@@ -101,6 +101,12 @@
             background: linear-gradient(to right, #22d3ee, #06b6d4);
         }
     </style>
+    <script>
+        // Fallback so inline onclick handlers never throw before app.js initializes.
+        window.openSignupModal = window.openSignupModal || function () {
+            window.location.href = '/?openLogin=1';
+        };
+    </script>
 </head>
 <body class="font-sans antialiased text-gray-900 dark:text-white mesh-bg dark:dark-mesh transition-colors duration-300">
 
